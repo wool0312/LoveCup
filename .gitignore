@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.db
+.env
+.env.local
+.pytest_cache/
+node_modules/
+dist/
+backend/static/
+.claude/
