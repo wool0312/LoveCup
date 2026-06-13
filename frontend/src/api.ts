@@ -24,6 +24,7 @@ export const api = {
   health: () => req<{ status: string }>("/health"),
 
   createGame: (body: {
+    custom_id?: string;
     player1_name: string;
     player2_name: string;
     japan_budget_cny?: string;

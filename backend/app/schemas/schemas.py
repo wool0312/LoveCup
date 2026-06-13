@@ -10,6 +10,7 @@ from ..models.entities import WDL
 
 
 class GameCreate(BaseModel):
+    custom_id: Optional[str] = None
     player1_name: str = Field(min_length=1)
     player2_name: str = Field(min_length=1)
     japan_budget_cny: Decimal = Decimal("1000")

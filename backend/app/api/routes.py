@@ -60,8 +60,11 @@ def _get_match(db: Session, match_id: str) -> e.Match:
 
 @router.post("/games")
 def create_game(payload: GameCreate, db: Session = Depends(get_db)):
+    game_id = payload.custom_id.strip() if payload.custom_id and payload.custom_id.strip() else _new_id("g")
+    if db.get(e.Game, game_id):
+        raise HTTPException(409, f"对局 ID「{game_id}」已存在，请换一个")
     game = e.Game(
-        id=_new_id("g"),
+        id=game_id,
         player1_id=_new_id("p"),
         player2_id=_new_id("p"),
         player1_name=payload.player1_name,

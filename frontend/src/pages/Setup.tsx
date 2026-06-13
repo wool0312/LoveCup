@@ -7,6 +7,7 @@ import { Banner, Button, Card, Field, Input } from "../ui";
 export default function Setup() {
   const { gameId } = useAppState();
   const nav = useNavigate();
+  const [customId, setCustomId] = useState("");
   const [p1, setP1] = useState("");
   const [p2, setP2] = useState("");
   const [budget, setBudget] = useState("1000");
@@ -25,6 +26,7 @@ export default function Setup() {
     }
     try {
       const game = await api.createGame({
+        custom_id: customId.trim() || undefined,
         player1_name: p1.trim(),
         player2_name: p2.trim(),
         japan_budget_cny: budget,
@@ -58,6 +60,9 @@ export default function Setup() {
 
       <Card className="space-y-3">
         <h2 className="text-sm font-semibold text-slate-700">开局设置</h2>
+        <Field label="对局 ID（可选，留空自动生成）">
+          <Input value={customId} onChange={(e) => setCustomId(e.target.value)} placeholder="例如 love2026" />
+        </Field>
         <Field label="玩家 1 昵称">
           <Input value={p1} onChange={(e) => setP1(e.target.value)} placeholder="例如 wool" />
         </Field>
