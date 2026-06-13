@@ -31,15 +31,6 @@ export const api = {
 
   getGame: (gameId: string) => req<Game>(`/games/${gameId}`),
 
-  createMatch: (
-    gameId: string,
-    body: { stage: string; home_team: string; away_team: string; kickoff_at: string }
-  ) =>
-    req<Match>(`/games/${gameId}/matches`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
-
   listMatchDays: (gameId: string) => req<MatchDay[]>(`/games/${gameId}/match-days`),
 
   listMatches: (gameId: string, matchDay?: string) =>

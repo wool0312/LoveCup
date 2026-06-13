@@ -46,11 +46,22 @@ def _auto_settle() -> None:
         log.exception("自动结算任务异常")
 
 
+def _sync_matches() -> None:
+    from .services.match_sync import sync_all_games
+    try:
+        result = sync_all_games()
+        if result.get("changes"):
+            log.info("赛程同步: %s", result["changes"])
+    except Exception:
+        log.exception("赛程同步任务异常")
+
+
 def start_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is None:
         _scheduler = BackgroundScheduler(timezone="UTC")
         _scheduler.add_job(_auto_lock_due_matches, "interval", minutes=1, id="auto_lock")
         _scheduler.add_job(_auto_settle, "interval", minutes=5, id="auto_settle")
+        _scheduler.add_job(_sync_matches, "interval", minutes=30, id="sync_matches")
         _scheduler.start()
     return _scheduler

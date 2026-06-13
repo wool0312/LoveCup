@@ -3,8 +3,6 @@ import { api } from "../api";
 import { useAppState } from "../store";
 import type { Game, Match, MatchDay as MatchDayT, Prediction, WDL } from "../types";
 import { Banner, Button, Card, Field, Input, Pill } from "../ui";
-
-const STAGES = ["小组赛", "32强", "16强", "8强", "半决赛", "三四名", "决赛"];
 const WDLS: WDL[] = ["主胜", "平", "客胜"];
 type Mode = "wdl" | "gd" | "score";
 
@@ -168,79 +166,6 @@ function PredictionView({ pred, name }: { pred: Prediction; name: string }) {
   );
 }
 
-function AddMatch({ game, onAdded }: { game: Game; onAdded: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [stage, setStage] = useState(STAGES[0]);
-  const [home, setHome] = useState("");
-  const [away, setAway] = useState("");
-  const [kickoff, setKickoff] = useState("");
-  const [err, setErr] = useState<string | null>(null);
-
-  async function add() {
-    setErr(null);
-    if (!home.trim() || !away.trim() || !kickoff) {
-      setErr("请填写主队、客队和开赛时间");
-      return;
-    }
-    try {
-      await api.createMatch(game.id, {
-        stage,
-        home_team: home.trim(),
-        away_team: away.trim(),
-        kickoff_at: `${kickoff}:00+08:00`, // 输入按北京时间处理
-      });
-      setHome("");
-      setAway("");
-      setKickoff("");
-      setOpen(false);
-      onAdded();
-    } catch (e) {
-      setErr(String(e));
-    }
-  }
-
-  if (!open)
-    return (
-      <Button variant="soft" className="w-full" onClick={() => setOpen(true)}>
-        + 新增比赛
-      </Button>
-    );
-
-  return (
-    <Card className="space-y-2">
-      <div className="flex flex-wrap gap-1">
-        {STAGES.map((s) => (
-          <button
-            key={s}
-            onClick={() => setStage(s)}
-            className={`rounded-lg px-2 py-1 text-xs ${
-              stage === s ? "bg-brand text-white" : "bg-slate-100 text-slate-600"
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <Input placeholder="主队" value={home} onChange={(e) => setHome(e.target.value)} />
-        <Input placeholder="客队" value={away} onChange={(e) => setAway(e.target.value)} />
-      </div>
-      <Field label="开赛时间（北京时间）">
-        <Input type="datetime-local" value={kickoff} onChange={(e) => setKickoff(e.target.value)} />
-      </Field>
-      {err && <Banner tone="error">{err}</Banner>}
-      <div className="flex gap-2">
-        <Button onClick={add} className="flex-1">
-          添加
-        </Button>
-        <Button variant="ghost" onClick={() => setOpen(false)}>
-          取消
-        </Button>
-      </div>
-    </Card>
-  );
-}
-
 export default function MatchDay({ game }: { game: Game }) {
   const { activePlayerId } = useAppState();
   const [days, setDays] = useState<MatchDayT[]>([]);
@@ -280,10 +205,8 @@ export default function MatchDay({ game }: { game: Game }) {
         ))}
       </div>
 
-      <AddMatch game={game} onAdded={reload} />
-
       {matches.length === 0 && (
-        <Banner tone="info">该比赛日还没有比赛，点上方「新增比赛」添加。</Banner>
+        <Banner tone="info">该比赛日暂无比赛。</Banner>
       )}
 
       {matches.map((m) => (
@@ -311,9 +234,13 @@ export default function MatchDay({ game }: { game: Game }) {
           </div>
 
           {m.home_goals !== null && (
-            <div className="mt-2 text-sm text-slate-600">
-              赛果 {m.home_goals}:{m.away_goals}
-              {m.advanced_team && ` · 晋级 ${m.advanced_team}`}
+            <div className="mt-2 flex items-center justify-center gap-3 rounded-lg bg-green-50 py-2 text-center">
+              <span className="font-semibold text-green-800">{m.home_team}</span>
+              <span className="text-xl font-bold text-green-700">{m.home_goals} : {m.away_goals}</span>
+              <span className="font-semibold text-green-800">{m.away_team}</span>
+              {m.advanced_team && (
+                <Pill tone="green">晋级 {m.advanced_team === "主胜" ? m.home_team : m.away_team}</Pill>
+              )}
             </div>
           )}
 

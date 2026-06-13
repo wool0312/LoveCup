@@ -1,13 +1,12 @@
 """API 出入参模型（Pydantic v2）。"""
 from __future__ import annotations
 
-import datetime as dt
 from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from ..models.entities import Stage, WDL
+from ..models.entities import WDL
 
 
 class GameCreate(BaseModel):
@@ -21,13 +20,6 @@ class GameCreate(BaseModel):
         if v < 0:
             raise ValueError("预算必须为非负数")
         return v
-
-
-class MatchCreate(BaseModel):
-    stage: Stage
-    home_team: str = Field(min_length=1)
-    away_team: str = Field(min_length=1)
-    kickoff_at: dt.datetime  # UTC
 
 
 class PredictionSubmit(BaseModel):

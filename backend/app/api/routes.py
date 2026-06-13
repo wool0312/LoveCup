@@ -11,19 +11,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..core.fixtures import populate_group_matches
-from ..core.stages import round_of, stage_points
+from ..core.stages import stage_points
 from ..core.stages import Stage as CoreStage
 from ..core.timeutil import is_match_locked, lock_time_for_match, match_day_of, now_utc, to_beijing
 from ..models import entities as e
 from ..models.base import SessionLocal
 from ..schemas.schemas import (
     GameCreate,
-    MatchCreate,
     OddsSubmit,
     PredictionSubmit,
 )
 from ..services import settlement as settle
+from ..services.match_sync import populate_matches
 
 router = APIRouter()
 
@@ -72,7 +71,7 @@ def create_game(payload: GameCreate, db: Session = Depends(get_db)):
     )
     db.add(game)
     db.flush()
-    match_count = populate_group_matches(db, game.id)
+    match_count = populate_matches(db, game.id)
     db.commit()
     result = _game_dict(game)
     result["matches_created"] = match_count
@@ -101,31 +100,7 @@ def get_game(game_id: str, db: Session = Depends(get_db)):
     return _game_dict(g)
 
 
-# ── 比赛管理 ──────────────────────────────────────────────
-
-@router.post("/games/{game_id}/matches")
-def create_match(game_id: str, payload: MatchCreate, db: Session = Depends(get_db)):
-    g = db.get(e.Game, game_id)
-    if g is None:
-        raise HTTPException(404, "对局不存在")
-    kickoff = payload.kickoff_at
-    if kickoff.tzinfo is not None:
-        kickoff = kickoff.astimezone(dt.timezone.utc).replace(tzinfo=None)
-    mday = match_day_of(kickoff)
-    m = e.Match(
-        id=_new_id("m"),
-        game_id=game_id,
-        stage=payload.stage,
-        round=e.RoundName(round_of(CoreStage(payload.stage.value)).value),
-        home_team=payload.home_team,
-        away_team=payload.away_team,
-        kickoff_at=kickoff,
-        match_day=mday,
-    )
-    db.add(m)
-    db.commit()
-    return _match_dict(db, m)
-
+# ── 比赛查询 ──────────────────────────────────────────────
 
 def _match_dict(db: Session, m: e.Match) -> dict:
     odds = m.odds
