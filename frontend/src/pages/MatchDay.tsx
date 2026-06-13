@@ -166,6 +166,43 @@ function PredictionView({ pred, name }: { pred: Prediction; name: string }) {
   );
 }
 
+function EditablePrediction({
+  match,
+  playerId,
+  playerName,
+  onSaved,
+}: {
+  match: Match;
+  playerId: string;
+  playerName: string;
+  onSaved: () => void;
+}) {
+  const existing = match.predictions.find((p) => p.player_id === playerId);
+  const [editing, setEditing] = useState(!existing);
+
+  if (!editing && existing) {
+    return (
+      <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
+        <PredictionView pred={existing} name={playerName} />
+        <Button variant="soft" className="w-full" onClick={() => setEditing(true)}>
+          修改预测
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <PredictionForm
+      match={match}
+      playerId={playerId}
+      onSaved={() => {
+        setEditing(false);
+        onSaved();
+      }}
+    />
+  );
+}
+
 export default function MatchDay({ game }: { game: Game }) {
   const { activePlayerId } = useAppState();
   const [days, setDays] = useState<MatchDayT[]>([]);
@@ -245,17 +282,19 @@ export default function MatchDay({ game }: { game: Game }) {
           )}
 
           {!m.locked && activePlayerId ? (
-            <PredictionForm match={m} playerId={activePlayerId} onSaved={reload} />
-          ) : (
-            <div className="mt-3 space-y-1 border-t border-slate-100 pt-2">
-              {m.predictions.length === 0 && (
-                <p className="text-xs text-slate-400">无预测记录</p>
-              )}
-              {m.predictions.map((p) => (
+            <EditablePrediction match={m} playerId={activePlayerId} playerName={nameOf(activePlayerId)} onSaved={reload} />
+          ) : null}
+
+          <div className="mt-3 space-y-1 border-t border-slate-100 pt-2">
+            {m.predictions.length === 0 && (
+              <p className="text-xs text-slate-400">无预测记录</p>
+            )}
+            {m.predictions
+              .filter((p) => m.locked || p.player_id !== activePlayerId)
+              .map((p) => (
                 <PredictionView key={p.player_id} pred={p} name={nameOf(p.player_id)} />
               ))}
-            </div>
-          )}
+          </div>
         </Card>
       ))}
     </div>
