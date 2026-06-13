@@ -9,6 +9,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..core.fixtures import group_round_for_teams
 from ..core.stages import round_of, Stage as CoreStage
 from ..core.timeutil import match_day_of
 from ..models import entities as e
@@ -33,6 +34,12 @@ def _cn(name: str) -> str:
 
 def _parse_utc(s: str) -> dt.datetime:
     return dt.datetime.fromisoformat(s.replace("Z", "+00:00")).replace(tzinfo=None)
+
+
+def _round_for_match(stage: e.Stage, home_cn: str, away_cn: str) -> e.RoundName:
+    if stage == e.Stage.GROUP:
+        return group_round_for_teams(home_cn, away_cn)
+    return e.RoundName(round_of(CoreStage(stage.value)).value)
 
 
 def fetch_api_matches() -> list[dict]:
@@ -77,7 +84,7 @@ def populate_matches(db: Session, game_id: str) -> int:
             id=f"m_{uuid.uuid4().hex[:10]}",
             game_id=game_id,
             stage=stage,
-            round=e.RoundName(round_of(CoreStage(stage.value)).value),
+            round=_round_for_match(stage, home_cn, away_cn),
             home_team=home_cn,
             away_team=away_cn,
             kickoff_at=ko,
@@ -112,6 +119,11 @@ def sync_matches_for_game(db: Session, game_id: str, api_matches: list[dict]) ->
 
         if key in existing_keys:
             m = existing_keys[key]
+            round_name = _round_for_match(stage, home_cn, away_cn)
+            if m.round != round_name:
+                old = m.round.value
+                m.round = round_name
+                changes.append(f"更新轮次: {home_cn} vs {away_cn} {old} → {round_name.value}")
             if m.kickoff_at != ko and m.status == e.MatchStatus.PENDING:
                 old = m.kickoff_at.isoformat()
                 m.kickoff_at = ko
@@ -122,7 +134,7 @@ def sync_matches_for_game(db: Session, game_id: str, api_matches: list[dict]) ->
                 id=f"m_{uuid.uuid4().hex[:10]}",
                 game_id=game_id,
                 stage=stage,
-                round=e.RoundName(round_of(CoreStage(stage.value)).value),
+                round=_round_for_match(stage, home_cn, away_cn),
                 home_team=home_cn,
                 away_team=away_cn,
                 kickoff_at=ko,
@@ -172,7 +184,7 @@ def _populate_fallback(db: Session, game_id: str) -> int:
             id=f"m_{uuid.uuid4().hex[:10]}",
             game_id=game_id,
             stage=e.Stage.GROUP,
-            round=e.RoundName(round_of(CoreStage(e.Stage.GROUP.value)).value),
+            round=group_round_for_teams(home, away),
             home_team=home,
             away_team=away,
             kickoff_at=ko,

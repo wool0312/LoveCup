@@ -10,7 +10,6 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from .stages import round_of, Stage as CoreStage
 from .timeutil import match_day_of
 from ..models import entities as e
 
@@ -104,6 +103,23 @@ GROUP_FIXTURES_UTC: list[tuple[str, str, str, int, int, int, int]] = [
 ]
 
 
+GROUP_ROUND_BY_PAIR: dict[frozenset[str], e.RoundName] = {}
+for i, (_, home, away, *_rest) in enumerate(GROUP_FIXTURES_UTC):
+    group_match_index = i % 6
+    if group_match_index < 2:
+        round_name = e.RoundName.R1
+    elif group_match_index < 4:
+        round_name = e.RoundName.R2
+    else:
+        round_name = e.RoundName.R3
+    GROUP_ROUND_BY_PAIR[frozenset((home, away))] = round_name
+
+
+def group_round_for_teams(home_team: str, away_team: str) -> e.RoundName:
+    """按小组内赛程判断小组第几轮；未命中时保守回退到第1轮。"""
+    return GROUP_ROUND_BY_PAIR.get(frozenset((home_team, away_team)), e.RoundName.R1)
+
+
 def populate_group_matches(db: Session, game_id: str) -> int:
     """为指定对局插入全部 72 场小组赛赛程，返回插入的场次数。"""
     count = 0
@@ -113,7 +129,7 @@ def populate_group_matches(db: Session, game_id: str) -> int:
             id=f"m_{uuid.uuid4().hex[:10]}",
             game_id=game_id,
             stage=e.Stage.GROUP,
-            round=e.RoundName(round_of(CoreStage(e.Stage.GROUP.value)).value),
+            round=group_round_for_teams(home, away),
             home_team=home,
             away_team=away,
             kickoff_at=ko,

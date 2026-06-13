@@ -194,6 +194,23 @@ def test_admin_can_reset_player_pin():
     assert r.status_code == 200
 
 
+def test_group_fixtures_keep_group_rounds():
+    r = client.post("/api/games", json=_game_payload())
+    gid = r.json()["id"]
+
+    r = client.get(f"/api/games/{gid}/matches")
+    assert r.status_code == 200, r.text
+    rounds = {
+        (m["home_team"], m["away_team"]): m["round"]
+        for m in r.json()
+        if m["stage"] == "小组赛"
+    }
+
+    assert rounds[("墨西哥", "南非")] == "第1轮"
+    assert rounds[("捷克", "南非")] == "第2轮"
+    assert rounds[("捷克", "墨西哥")] == "第3轮"
+
+
 def test_one_double_per_match_day():
     r = client.post("/api/games", json=_game_payload())
     game = r.json()

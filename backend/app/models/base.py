@@ -5,7 +5,7 @@ import os
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Numeric, String, TypeDecorator, create_engine, inspect, text
+from sqlalchemy import Numeric, String, TypeDecorator, create_engine, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 
@@ -70,6 +70,8 @@ def _ensure_lightweight_migrations() -> None:
         _add_column_if_missing("predictions", "bound_draw_odds", _decimal_column_type())
         _add_column_if_missing("predictions", "bound_away_odds", _decimal_column_type())
         _add_column_if_missing("predictions", "bound_odds_source", "VARCHAR")
+    if "matches" in tables:
+        _repair_group_match_rounds()
 
 
 def _decimal_column_type() -> str:
@@ -82,3 +84,26 @@ def _add_column_if_missing(table: str, column: str, column_type: str) -> None:
         return
     with engine.begin() as conn:
         conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {column} {column_type}'))
+
+
+def _repair_group_match_rounds() -> None:
+    """修正旧数据里所有小组赛都显示为第1轮的问题。"""
+    from . import entities as e
+    from ..core.fixtures import group_round_for_teams
+
+    db = SessionLocal()
+    changed = False
+    try:
+        matches = list(db.scalars(select(e.Match).where(e.Match.stage == e.Stage.GROUP)))
+        for match in matches:
+            expected = group_round_for_teams(match.home_team, match.away_team)
+            if match.round != expected:
+                match.round = expected
+                changed = True
+        if changed:
+            db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
