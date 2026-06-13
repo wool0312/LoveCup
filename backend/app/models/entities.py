@@ -85,6 +85,7 @@ class Game(Base):
     player2_name: Mapped[str] = mapped_column(String)
     rule_version: Mapped[str] = mapped_column(String, default="v0.5")
     japan_budget_cny: Mapped[Decimal] = mapped_column(DecimalText, default=Decimal("1000"))
+    admin_pin_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[GameStatus] = mapped_column(SAEnum(GameStatus), default=GameStatus.ONGOING)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
 
@@ -148,6 +149,10 @@ class Prediction(Base):
     pred_home: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     pred_away: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     use_double: Mapped[bool] = mapped_column(Boolean, default=False)
+    bound_home_odds: Mapped[Optional[Decimal]] = mapped_column(DecimalText, nullable=True)
+    bound_draw_odds: Mapped[Optional[Decimal]] = mapped_column(DecimalText, nullable=True)
+    bound_away_odds: Mapped[Optional[Decimal]] = mapped_column(DecimalText, nullable=True)
+    bound_odds_source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     submitted_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
     locked_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime, nullable=True)
 

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
+import hmac
 import json
 import uuid
 from decimal import Decimal
@@ -17,6 +19,7 @@ from ..core.timeutil import is_match_locked, lock_time_for_match, match_day_of, 
 from ..models import entities as e
 from ..models.base import SessionLocal
 from ..schemas.schemas import (
+    AdminAction,
     GameCreate,
     OddsSubmit,
     PredictionSubmit,
@@ -37,6 +40,34 @@ def get_db():
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:10]}"
+
+
+def _pin_hash(game_id: str, pin: str) -> str:
+    return hashlib.sha256(f"{game_id}:{pin}".encode("utf-8")).hexdigest()
+
+
+def _verify_admin_pin(game: e.Game, admin_pin: Optional[str]) -> None:
+    # 兼容旧对局：没有 PIN 的历史对局先不拦截，否则用户会被锁在门外。
+    if not game.admin_pin_hash:
+        return
+    if not admin_pin or not hmac.compare_digest(game.admin_pin_hash, _pin_hash(game.id, admin_pin)):
+        raise HTTPException(403, "管理 PIN 错误")
+
+
+def _bound_odds_payload(odds: Optional[e.OddsSnapshot]) -> dict:
+    if odds is None or not odds.available:
+        return {
+            "bound_home_odds": None,
+            "bound_draw_odds": None,
+            "bound_away_odds": None,
+            "bound_odds_source": None,
+        }
+    return {
+        "bound_home_odds": odds.home_odds,
+        "bound_draw_odds": odds.draw_odds,
+        "bound_away_odds": odds.away_odds,
+        "bound_odds_source": odds.source,
+    }
 
 
 def _audit(db: Session, *, entity: str, entity_id: str, actor: str, action: str,
@@ -70,6 +101,7 @@ def create_game(payload: GameCreate, db: Session = Depends(get_db)):
         player1_name=payload.player1_name,
         player2_name=payload.player2_name,
         japan_budget_cny=payload.japan_budget_cny,
+        admin_pin_hash=_pin_hash(game_id, payload.admin_pin) if payload.admin_pin else None,
         rule_version="v0.5",
     )
     db.add(game)
@@ -104,10 +136,11 @@ def get_game(game_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/games/{game_id}")
-def delete_game(game_id: str, db: Session = Depends(get_db)):
+def delete_game(game_id: str, payload: AdminAction, db: Session = Depends(get_db)):
     g = db.get(e.Game, game_id)
     if g is None:
         raise HTTPException(404, "对局不存在")
+    _verify_admin_pin(g, payload.admin_pin)
     matches = list(db.scalars(select(e.Match).where(e.Match.game_id == game_id)))
     match_ids = [m.id for m in matches]
     if match_ids:
@@ -167,6 +200,10 @@ def _pred_dict(p: e.Prediction) -> dict:
         "pred_home": p.pred_home,
         "pred_away": p.pred_away,
         "use_double": p.use_double,
+        "bound_home_odds": str(p.bound_home_odds) if p.bound_home_odds is not None else None,
+        "bound_draw_odds": str(p.bound_draw_odds) if p.bound_draw_odds is not None else None,
+        "bound_away_odds": str(p.bound_away_odds) if p.bound_away_odds is not None else None,
+        "bound_odds_source": p.bound_odds_source,
         "locked_at": p.locked_at.isoformat() if p.locked_at else None,
     }
 
@@ -255,6 +292,8 @@ def submit_prediction(match_id: str, payload: PredictionSubmit, db: Session = De
         existing.pred_home = payload.pred_home
         existing.pred_away = payload.pred_away
         existing.use_double = use_double
+        for key, value in _bound_odds_payload(m.odds).items():
+            setattr(existing, key, value)
         existing.submitted_at = now_utc().replace(tzinfo=None)
         pred = existing
     else:
@@ -268,6 +307,7 @@ def submit_prediction(match_id: str, payload: PredictionSubmit, db: Session = De
             pred_home=payload.pred_home,
             pred_away=payload.pred_away,
             use_double=use_double,
+            **_bound_odds_payload(m.odds),
         )
         db.add(pred)
     db.commit()
@@ -279,10 +319,20 @@ def submit_prediction(match_id: str, payload: PredictionSubmit, db: Session = De
 @router.post("/matches/{match_id}/odds")
 def submit_odds(match_id: str, payload: OddsSubmit, db: Session = Depends(get_db)):
     m = _get_match(db, match_id)
+    game = db.get(e.Game, m.game_id)
+    _verify_admin_pin(game, payload.admin_pin)
     if is_match_locked(m.kickoff_at):
         raise HTTPException(409, "已过锁定时刻（开赛前 1 小时），赔率不可修改")
 
     odds = m.odds
+    before = None if odds is None else {
+        "home_odds": str(odds.home_odds) if odds.home_odds is not None else None,
+        "draw_odds": str(odds.draw_odds) if odds.draw_odds is not None else None,
+        "away_odds": str(odds.away_odds) if odds.away_odds is not None else None,
+        "available": odds.available,
+        "source": odds.source,
+        "recorded_by": odds.recorded_by,
+    }
     if odds is None:
         odds = e.OddsSnapshot(match_id=match_id, recorded_by=payload.recorded_by)
         db.add(odds)
@@ -293,6 +343,22 @@ def submit_odds(match_id: str, payload: OddsSubmit, db: Session = Depends(get_db
     odds.source = payload.source
     odds.recorded_by = payload.recorded_by
     odds.recorded_at = now_utc().replace(tzinfo=None)
+    _audit(
+        db,
+        entity="OddsSnapshot",
+        entity_id=match_id,
+        actor=payload.recorded_by,
+        action="修改赔率",
+        before=before,
+        after={
+            "home_odds": str(odds.home_odds) if odds.home_odds is not None else None,
+            "draw_odds": str(odds.draw_odds) if odds.draw_odds is not None else None,
+            "away_odds": str(odds.away_odds) if odds.away_odds is not None else None,
+            "available": odds.available,
+            "source": odds.source,
+            "recorded_by": odds.recorded_by,
+        },
+    )
     db.commit()
     return _match_dict(db, m)
 

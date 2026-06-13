@@ -10,6 +10,7 @@ export default function Setup() {
   const [customId, setCustomId] = useState("");
   const [p1, setP1] = useState("");
   const [p2, setP2] = useState("");
+  const [adminPin, setAdminPin] = useState("");
   const [budget, setBudget] = useState("1000");
   const [err, setErr] = useState<string | null>(null);
   const [loadId, setLoadId] = useState("");
@@ -24,11 +25,16 @@ export default function Setup() {
       setErr("预算必须为非负数");
       return;
     }
+    if (adminPin.trim().length < 4) {
+      setErr("管理 PIN 至少 4 位，用于修改赔率和删除对局");
+      return;
+    }
     try {
       const game = await api.createGame({
         custom_id: customId.trim() || undefined,
         player1_name: p1.trim(),
         player2_name: p2.trim(),
+        admin_pin: adminPin.trim(),
         japan_budget_cny: budget,
       });
       setGameId(game.id);
@@ -68,6 +74,14 @@ export default function Setup() {
         </Field>
         <Field label="玩家 2 昵称">
           <Input value={p2} onChange={(e) => setP2(e.target.value)} placeholder="例如 mei" />
+        </Field>
+        <Field label="管理 PIN（至少 4 位）">
+          <Input
+            type="password"
+            value={adminPin}
+            onChange={(e) => setAdminPin(e.target.value)}
+            placeholder="修改赔率 / 删除对局时使用"
+          />
         </Field>
         <Field label="日本礼物预算上限（元）">
           <Input

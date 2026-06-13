@@ -5,7 +5,7 @@ import os
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Numeric, String, TypeDecorator, create_engine
+from sqlalchemy import Numeric, String, TypeDecorator, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 
@@ -51,3 +51,32 @@ def init_db() -> None:
     from . import entities  # noqa: F401  确保模型已注册到 Base.metadata
 
     Base.metadata.create_all(bind=engine)
+    _ensure_lightweight_migrations()
+
+
+def _ensure_lightweight_migrations() -> None:
+    """给已部署的 SQLite/PostgreSQL 老库补新增列。
+
+    这个项目目前还没引入 Alembic；这些列都是 nullable，直接补列足够安全。
+    """
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "games" in tables:
+        _add_column_if_missing("games", "admin_pin_hash", "VARCHAR")
+    if "predictions" in tables:
+        _add_column_if_missing("predictions", "bound_home_odds", _decimal_column_type())
+        _add_column_if_missing("predictions", "bound_draw_odds", _decimal_column_type())
+        _add_column_if_missing("predictions", "bound_away_odds", _decimal_column_type())
+        _add_column_if_missing("predictions", "bound_odds_source", "VARCHAR")
+
+
+def _decimal_column_type() -> str:
+    return "NUMERIC(20, 4)" if engine.dialect.name == "postgresql" else "VARCHAR"
+
+
+def _add_column_if_missing(table: str, column: str, column_type: str) -> None:
+    existing = {c["name"] for c in inspect(engine).get_columns(table)}
+    if column in existing:
+        return
+    with engine.begin() as conn:
+        conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {column} {column_type}'))

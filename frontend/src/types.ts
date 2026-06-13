@@ -32,6 +32,10 @@ export interface Prediction {
   pred_home: number | null;
   pred_away: number | null;
   use_double: boolean;
+  bound_home_odds: string | null;
+  bound_draw_odds: string | null;
+  bound_away_odds: string | null;
+  bound_odds_source: string | null;
   locked_at: string | null;
 }
 

@@ -51,7 +51,15 @@ def _build_prediction(p: e.Prediction) -> sc.Prediction:
     )
 
 
-def _odds_for(wdl: e.WDL, odds: Optional[e.OddsSnapshot]) -> Optional[Decimal]:
+def _odds_for(wdl: e.WDL, pred: e.Prediction, odds: Optional[e.OddsSnapshot]) -> Optional[Decimal]:
+    bound = {
+        e.WDL.HOME: pred.bound_home_odds,
+        e.WDL.DRAW: pred.bound_draw_odds,
+        e.WDL.AWAY: pred.bound_away_odds,
+    }[wdl]
+    if bound is not None:
+        return bound
+    # 兼容旧预测：历史数据没有绑定赔率时，回退到比赛当前赔率。
     if odds is None or not odds.available:
         return None
     return {
@@ -72,8 +80,8 @@ def compute_match_score(
         return Decimal(0), e.ScoreMode.NORMAL, None, {"reason": "未提交预测，计 0 分"}
 
     core_pred = _build_prediction(pred)
-    odds_used = _odds_for(pred.wdl, odds)
-    odds_available = odds is not None and odds.available and odds_used is not None
+    odds_used = _odds_for(pred.wdl, pred, odds)
+    odds_available = odds_used is not None
 
     use_double = pred.use_double and odds_available and not sp.is_final
     mode = e.ScoreMode.DOUBLE if use_double else e.ScoreMode.NORMAL
@@ -92,6 +100,7 @@ def compute_match_score(
             "mode": "Double",
             "stake": str(sp.stake),
             "odds": str(odds_used),
+            "odds_source": pred.bound_odds_source or (odds.source if odds else None),
             "wdl_correct": wdl_correct,
             "base": str(sp.stake * (odds_used - 1)) if wdl_correct else str(-sp.stake),
             "gd_bonus": str(sp.gd) if gd_hit else "0",

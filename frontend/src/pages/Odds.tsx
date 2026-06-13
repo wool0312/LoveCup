@@ -9,12 +9,17 @@ function OddsEditor({ match, recorder, onSaved }: { match: Match; recorder: stri
   const [d, setD] = useState(match.odds?.draw_odds ?? "");
   const [a, setA] = useState(match.odds?.away_odds ?? "");
   const [source, setSource] = useState(match.odds?.source ?? "OddsPortal");
+  const [adminPin, setAdminPin] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
 
   async function save(available: boolean) {
     setErr(null);
     setOk(false);
+    if (!adminPin.trim()) {
+      setErr("请填写管理 PIN");
+      return;
+    }
     try {
       await api.submitOdds(match.id, {
         recorded_by: recorder,
@@ -23,6 +28,7 @@ function OddsEditor({ match, recorder, onSaved }: { match: Match; recorder: stri
         away_odds: available ? a || null : null,
         available,
         source: available ? source : "无盘",
+        admin_pin: adminPin.trim(),
       });
       setOk(true);
       onSaved();
@@ -57,6 +63,14 @@ function OddsEditor({ match, recorder, onSaved }: { match: Match; recorder: stri
       </div>
       <Field label="来源">
         <Input value={source} onChange={(e) => setSource(e.target.value)} />
+      </Field>
+      <Field label="管理 PIN">
+        <Input
+          type="password"
+          value={adminPin}
+          onChange={(e) => setAdminPin(e.target.value)}
+          placeholder="修改赔率需要 PIN"
+        />
       </Field>
       {err && <Banner tone="error">{err}</Banner>}
       {ok && <Banner tone="success">已保存赔率快照</Banner>}

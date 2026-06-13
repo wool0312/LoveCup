@@ -13,6 +13,7 @@ class GameCreate(BaseModel):
     custom_id: Optional[str] = None
     player1_name: str = Field(min_length=1)
     player2_name: str = Field(min_length=1)
+    admin_pin: Optional[str] = None
     japan_budget_cny: Decimal = Decimal("1000")
 
     @field_validator("japan_budget_cny")
@@ -21,6 +22,13 @@ class GameCreate(BaseModel):
         if v < 0:
             raise ValueError("预算必须为非负数")
         return v
+
+    @field_validator("admin_pin")
+    @classmethod
+    def admin_pin_valid(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v.strip() and len(v.strip()) < 4:
+            raise ValueError("管理 PIN 至少 4 位")
+        return v.strip() if v else None
 
 
 class PredictionSubmit(BaseModel):
@@ -35,6 +43,7 @@ class PredictionSubmit(BaseModel):
 
 
 class OddsSubmit(BaseModel):
+    admin_pin: Optional[str] = None
     recorded_by: str
     home_odds: Optional[Decimal] = None
     draw_odds: Optional[Decimal] = None
@@ -50,3 +59,5 @@ class OddsSubmit(BaseModel):
         return v
 
 
+class AdminAction(BaseModel):
+    admin_pin: Optional[str] = None

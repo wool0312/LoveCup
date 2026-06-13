@@ -3,8 +3,6 @@ import datetime as dt
 import os
 import tempfile
 
-import pytest
-
 # 必须在导入 app 之前设置数据库地址，指向临时文件
 _tmpdir = tempfile.mkdtemp()
 os.environ["LOVECUP_DATABASE_URL"] = f"sqlite:///{_tmpdir}/test.db"
@@ -12,7 +10,11 @@ os.environ["LOVECUP_DATABASE_URL"] = f"sqlite:///{_tmpdir}/test.db"
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.main import app  # noqa: E402
-from app.models.base import init_db  # noqa: E402
+from app.core.stages import round_of, Stage as CoreStage  # noqa: E402
+from app.core.timeutil import match_day_of  # noqa: E402
+from app.models import entities as e  # noqa: E402
+from app.models.base import init_db, SessionLocal  # noqa: E402
+from app.services import settlement as settle  # noqa: E402
 
 init_db()  # TestClient 不走 lifespan，显式建表
 client = TestClient(app)
@@ -26,6 +28,43 @@ def _future_kickoff_beijing_afternoon(days: int = 1) -> str:
     return kickoff.astimezone(dt.timezone.utc).replace(tzinfo=None).isoformat()
 
 
+def _create_match(game_id: str, *, stage=e.Stage.GROUP, home="巴西", away="韩国", days=1) -> str:
+    kickoff = dt.datetime.fromisoformat(_future_kickoff_beijing_afternoon(days))
+    match = e.Match(
+        id=f"test_m_{dt.datetime.utcnow().timestamp()}",
+        game_id=game_id,
+        stage=stage,
+        round=e.RoundName(round_of(CoreStage(stage.value)).value),
+        home_team=home,
+        away_team=away,
+        kickoff_at=kickoff,
+        match_day=match_day_of(kickoff),
+    )
+    db = SessionLocal()
+    try:
+        db.add(match)
+        db.commit()
+        return match.id
+    finally:
+        db.close()
+
+
+def _settle_match(match_id: str, home_goals: int, away_goals: int):
+    db = SessionLocal()
+    try:
+        match = db.get(e.Match, match_id)
+        match.home_goals = home_goals
+        match.away_goals = away_goals
+        scores = settle.settle_match(db, match)
+        settle.recompute_standings(db, match.game_id)
+        return {
+            s.player_id: {"score": s.score, "mode": s.mode, "odds_used": s.odds_used}
+            for s in scores
+        }
+    finally:
+        db.close()
+
+
 def test_full_flow_group_double_underdog():
     # 1. 开局设置
     r = client.post("/api/games", json={"player1_name": "wool", "player2_name": "mei"})
@@ -34,15 +73,8 @@ def test_full_flow_group_double_underdog():
     gid = game["id"]
     p1, p2 = game["players"][0]["id"], game["players"][1]["id"]
 
-    # 2. 创建一场小组赛（未来，未锁定）
-    r = client.post(f"/api/games/{gid}/matches", json={
-        "stage": "小组赛", "home_team": "巴西", "away_team": "韩国",
-        "kickoff_at": _future_kickoff_beijing_afternoon(),
-    })
-    assert r.status_code == 200, r.text
-    m = r.json()
-    mid = m["id"]
-    assert m["locked"] is False
+    # 2. 准备一场小组赛（赛程由系统同步，测试中直接造一场未来比赛）
+    mid = _create_match(gid)
 
     # 3. 录入赔率（客胜冷门 5.00）
     r = client.post(f"/api/matches/{mid}/odds", json={
@@ -57,24 +89,28 @@ def test_full_flow_group_double_underdog():
         "pred_home": 0, "pred_away": 1, "use_double": True,
     })
     assert r.status_code == 200, r.text
+    assert r.json()["bound_away_odds"] == "5.00"
     r = client.post(f"/api/matches/{mid}/predictions", json={
         "player_id": p2, "wdl": "主胜",
     })
     assert r.status_code == 200, r.text
 
-    # 5. 录入赛果 0:1（客胜冷门命中）
-    r = client.post(f"/api/matches/{mid}/result", json={
-        "home_goals": 0, "away_goals": 1, "actor": "wool",
+    # 5. 预测后修改赔率，结算仍应使用预测提交时绑定的 5.00
+    r = client.post(f"/api/matches/{mid}/odds", json={
+        "recorded_by": "wool", "home_odds": "1.30", "draw_odds": "3.00",
+        "away_odds": "2.00", "available": True, "source": "OddsPortal",
     })
     assert r.status_code == 200, r.text
-    data = r.json()
+
+    # 6. 自动赛果服务写入 0:1（客胜冷门命中）
+    scores = _settle_match(mid, 0, 1)
     from decimal import Decimal
-    scores = {s["player_id"]: s for s in data["scores"]}
     # p1：Double 押中冷门 = 1×(5.00−1) + 净胜球1 + 精确比分2 = 7（PRD §6 #5）
-    assert Decimal(scores[p1]["score"]) == Decimal(7)
-    assert scores[p1]["mode"] == "Double"
+    assert scores[p1]["score"] == Decimal(7)
+    assert scores[p1]["odds_used"] == Decimal("5.00")
+    assert scores[p1]["mode"] == e.ScoreMode.DOUBLE
     # p2：押主胜错 → 0
-    assert Decimal(scores[p2]["score"]) == Decimal(0)
+    assert scores[p2]["score"] == Decimal(0)
 
 
 def test_double_disabled_on_final():
@@ -83,11 +119,7 @@ def test_double_disabled_on_final():
     gid = game["id"]
     p1 = game["players"][0]["id"]
 
-    r = client.post(f"/api/games/{gid}/matches", json={
-        "stage": "决赛", "home_team": "法国", "away_team": "阿根廷",
-        "kickoff_at": _future_kickoff_beijing_afternoon(2),
-    })
-    mid = r.json()["id"]
+    mid = _create_match(gid, stage=e.Stage.FINAL, home="法国", away="阿根廷", days=2)
     client.post(f"/api/matches/{mid}/odds", json={
         "recorded_by": "a", "home_odds": "2.00", "draw_odds": "3.00", "away_odds": "3.50",
     })
@@ -104,15 +136,11 @@ def test_one_double_per_match_day():
     game = r.json()
     gid = game["id"]
     p1 = game["players"][0]["id"]
-    kickoff = _future_kickoff_beijing_afternoon(3)
 
     # 同一比赛日两场小组赛
     ids = []
     for home, away in [("德国", "日本"), ("西班牙", "摩洛哥")]:
-        r = client.post(f"/api/games/{gid}/matches", json={
-            "stage": "小组赛", "home_team": home, "away_team": away, "kickoff_at": kickoff,
-        })
-        mid = r.json()["id"]
+        mid = _create_match(gid, home=home, away=away, days=3)
         ids.append(mid)
         client.post(f"/api/matches/{mid}/odds", json={
             "recorded_by": "a", "home_odds": "2.00", "draw_odds": "3.00", "away_odds": "3.50",

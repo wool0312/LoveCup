@@ -27,12 +27,14 @@ export const api = {
     custom_id?: string;
     player1_name: string;
     player2_name: string;
+    admin_pin?: string;
     japan_budget_cny?: string;
   }) => req<Game>("/games", { method: "POST", body: JSON.stringify(body) }),
 
   getGame: (gameId: string) => req<Game>(`/games/${gameId}`),
 
-  deleteGame: (gameId: string) => req(`/games/${gameId}`, { method: "DELETE" }),
+  deleteGame: (gameId: string, adminPin: string) =>
+    req(`/games/${gameId}`, { method: "DELETE", body: JSON.stringify({ admin_pin: adminPin }) }),
 
   listMatchDays: (gameId: string) => req<MatchDay[]>(`/games/${gameId}/match-days`),
 
@@ -68,6 +70,7 @@ export const api = {
       away_odds?: string | null;
       available?: boolean;
       source?: string | null;
+      admin_pin?: string;
     }
   ) => req<Match>(`/matches/${matchId}/odds`, { method: "POST", body: JSON.stringify(body) }),
 

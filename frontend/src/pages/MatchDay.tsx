@@ -156,11 +156,13 @@ function PredictionView({ pred, name }: { pred: Prediction; name: string }) {
   let detail = pred.wdl;
   if (pred.has_score) detail += ` · 比分 ${pred.pred_home}:${pred.pred_away}`;
   else if (pred.has_gd) detail += ` · 净胜球 ${pred.sgd}`;
+  const boundOdds =
+    pred.wdl === "主胜" ? pred.bound_home_odds : pred.wdl === "平" ? pred.bound_draw_odds : pred.bound_away_odds;
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-slate-500">{name}</span>
       <span className="text-slate-700">
-        {detail} {pred.use_double && <Pill tone="rose">Double</Pill>}
+        {detail} {pred.use_double && <Pill tone="rose">Double{boundOdds ? ` @${boundOdds}` : ""}</Pill>}
       </span>
     </div>
   );

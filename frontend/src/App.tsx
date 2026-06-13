@@ -33,12 +33,14 @@ function TopBar({ game, onExit }: { game: Game | null; onExit: () => void }) {
   }
 
   async function deleteGame() {
+    const adminPin = window.prompt("请输入管理 PIN，确认删除该对局");
+    if (!adminPin) return;
     try {
-      await api.deleteGame(game!.id);
+      await api.deleteGame(game!.id, adminPin);
       setGameId(null);
       setActivePlayer(null);
-    } catch {
-      alert("删除失败");
+    } catch (e) {
+      alert(`删除失败：${String(e)}`);
     }
   }
 
