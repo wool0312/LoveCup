@@ -103,6 +103,25 @@ def get_game(game_id: str, db: Session = Depends(get_db)):
     return _game_dict(g)
 
 
+@router.delete("/games/{game_id}")
+def delete_game(game_id: str, db: Session = Depends(get_db)):
+    g = db.get(e.Game, game_id)
+    if g is None:
+        raise HTTPException(404, "对局不存在")
+    matches = list(db.scalars(select(e.Match).where(e.Match.game_id == game_id)))
+    match_ids = [m.id for m in matches]
+    if match_ids:
+        db.query(e.MatchScore).filter(e.MatchScore.match_id.in_(match_ids)).delete(synchronize_session=False)
+        db.query(e.Prediction).filter(e.Prediction.match_id.in_(match_ids)).delete(synchronize_session=False)
+        db.query(e.OddsSnapshot).filter(e.OddsSnapshot.match_id.in_(match_ids)).delete(synchronize_session=False)
+    db.query(e.Match).filter_by(game_id=game_id).delete()
+    db.query(e.RoundSummary).filter_by(game_id=game_id).delete()
+    db.query(e.FinalResult).filter_by(game_id=game_id).delete()
+    db.delete(g)
+    db.commit()
+    return {"deleted": game_id}
+
+
 # ── 比赛查询 ──────────────────────────────────────────────
 
 def _match_dict(db: Session, m: e.Match) -> dict:

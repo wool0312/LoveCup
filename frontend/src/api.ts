@@ -32,6 +32,8 @@ export const api = {
 
   getGame: (gameId: string) => req<Game>(`/games/${gameId}`),
 
+  deleteGame: (gameId: string) => req(`/games/${gameId}`, { method: "DELETE" }),
+
   listMatchDays: (gameId: string) => req<MatchDay[]>(`/games/${gameId}/match-days`),
 
   listMatches: (gameId: string, matchDay?: string) =>

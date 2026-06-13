@@ -18,9 +18,11 @@ const NAV = [
   { to: "/final", label: "颁奖" },
 ];
 
-function TopBar({ game }: { game: Game | null }) {
+function TopBar({ game, onExit }: { game: Game | null; onExit: () => void }) {
   const { activePlayerId } = useAppState();
   const [copied, setCopied] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   if (!game) return null;
 
   function copyId() {
@@ -28,6 +30,16 @@ function TopBar({ game }: { game: Game | null }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
+  }
+
+  async function deleteGame() {
+    try {
+      await api.deleteGame(game!.id);
+      setGameId(null);
+      setActivePlayer(null);
+    } catch {
+      alert("删除失败");
+    }
   }
 
   return (
@@ -51,11 +63,34 @@ function TopBar({ game }: { game: Game | null }) {
           ))}
         </div>
       </div>
-      <div className="mt-1 flex items-center gap-1 text-xs text-slate-400">
-        <span>对局 ID：{game.id}</span>
-        <button onClick={copyId} className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-500 hover:bg-slate-200">
-          {copied ? "已复制" : "复制"}
-        </button>
+      <div className="mt-1 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-1 text-slate-400">
+          <span>对局 ID：{game.id}</span>
+          <button onClick={copyId} className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-500 hover:bg-slate-200">
+            {copied ? "已复制" : "复制"}
+          </button>
+        </div>
+        <div className="relative">
+          <button onClick={() => setShowMenu(!showMenu)} className="rounded bg-slate-100 px-2 py-0.5 text-slate-500 hover:bg-slate-200">
+            ···
+          </button>
+          {showMenu && (
+            <div className="absolute right-0 top-6 z-10 w-28 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+              <button onClick={() => { onExit(); setShowMenu(false); }} className="block w-full px-3 py-1.5 text-left text-sm text-slate-600 hover:bg-slate-50">
+                退出对局
+              </button>
+              {!confirmDelete ? (
+                <button onClick={() => setConfirmDelete(true)} className="block w-full px-3 py-1.5 text-left text-sm text-red-500 hover:bg-red-50">
+                  删除对局
+                </button>
+              ) : (
+                <button onClick={() => { deleteGame(); setShowMenu(false); }} className="block w-full px-3 py-1.5 text-left text-sm font-semibold text-red-600 hover:bg-red-50">
+                  确认删除
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -104,7 +139,7 @@ function Shell() {
 
   return (
     <div className="mx-auto flex min-h-full max-w-xl flex-col">
-      <TopBar game={game} />
+      <TopBar game={game} onExit={() => { setGameId(null); setActivePlayer(null); }} />
       <main className="flex-1 p-4 pb-24">
         <Routes>
           <Route path="/setup" element={<Setup />} />
