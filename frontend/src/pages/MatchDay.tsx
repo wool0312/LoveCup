@@ -5,6 +5,15 @@ import type { Game, Match, MatchDay as MatchDayT, Prediction, WDL } from "../typ
 import { Banner, Button, Card, Field, Input, Pill } from "../ui";
 const WDLS: WDL[] = ["主胜", "平", "客胜"];
 type Mode = "wdl" | "gd" | "score";
+type MatchFilter = "all" | "today" | "pending" | "mine_unpredicted" | "settled";
+
+const FILTERS: { value: MatchFilter; label: string }[] = [
+  { value: "all", label: "全部" },
+  { value: "today", label: "今日" },
+  { value: "pending", label: "待预测" },
+  { value: "mine_unpredicted", label: "我的未预测" },
+  { value: "settled", label: "已结算" },
+];
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleString("zh-CN", {
@@ -13,6 +22,17 @@ function fmtTime(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function todayBeijing() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
 }
 
 function PredictionForm({
@@ -224,6 +244,7 @@ export default function MatchDay({ game }: { game: Game }) {
   const { activePlayerId } = useAppState();
   const [days, setDays] = useState<MatchDayT[]>([]);
   const [selected, setSelected] = useState<string | "all">("all");
+  const [filter, setFilter] = useState<MatchFilter>("all");
   const [matches, setMatches] = useState<Match[]>([]);
 
   function reload() {
@@ -234,12 +255,41 @@ export default function MatchDay({ game }: { game: Game }) {
   useEffect(reload, [game.id, selected]);
 
   const nameOf = (id: string) => game.players.find((p) => p.id === id)?.name ?? id;
+  const beijingToday = todayBeijing();
+  const filteredMatches = matches.filter((m) => {
+    if (filter === "today") return m.match_day === beijingToday;
+    if (filter === "pending") return m.status === "待预测" && !m.locked;
+    if (filter === "mine_unpredicted") {
+      return (
+        !!activePlayerId &&
+        !m.locked &&
+        m.status === "待预测" &&
+        !m.predictions.some((p) => p.player_id === activePlayerId)
+      );
+    }
+    if (filter === "settled") return m.status === "已结算" || m.home_goals !== null;
+    return true;
+  });
+
+  function selectFilter(next: MatchFilter) {
+    setFilter(next);
+    if (next === "today") {
+      setSelected("all");
+    }
+  }
+
+  function selectDay(next: string | "all") {
+    setSelected(next);
+    if (filter === "today") {
+      setFilter("all");
+    }
+  }
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-1">
         <button
-          onClick={() => setSelected("all")}
+          onClick={() => selectDay("all")}
           className={`rounded-lg px-3 py-1 text-xs ${
             selected === "all" ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"
           }`}
@@ -249,7 +299,7 @@ export default function MatchDay({ game }: { game: Game }) {
         {days.map((d) => (
           <button
             key={d.match_day}
-            onClick={() => setSelected(d.match_day)}
+            onClick={() => selectDay(d.match_day)}
             className={`rounded-lg px-3 py-1 text-xs ${
               selected === d.match_day ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"
             }`}
@@ -259,11 +309,29 @@ export default function MatchDay({ game }: { game: Game }) {
         ))}
       </div>
 
-      {matches.length === 0 && (
-        <Banner tone="info">该比赛日暂无比赛。</Banner>
+      <div className="flex flex-wrap gap-1 rounded-xl bg-white p-2 shadow-sm ring-1 ring-slate-100">
+        {FILTERS.map((item) => (
+          <button
+            key={item.value}
+            onClick={() => selectFilter(item.value)}
+            className={`rounded-lg px-3 py-1 text-xs font-medium ${
+              filter === item.value ? "bg-brand text-white" : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {filter === "mine_unpredicted" && !activePlayerId && (
+        <Banner tone="info">请先在顶部选择当前玩家，再查看我的未预测。</Banner>
       )}
 
-      {matches.map((m) => (
+      {filteredMatches.length === 0 && (
+        <Banner tone="info">当前筛选下暂无比赛。</Banner>
+      )}
+
+      {filteredMatches.map((m) => (
         <Card key={m.id}>
           <div className="flex items-start justify-between">
             <div>
