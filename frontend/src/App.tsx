@@ -20,25 +20,42 @@ const NAV = [
 
 function TopBar({ game }: { game: Game | null }) {
   const { activePlayerId } = useAppState();
+  const [copied, setCopied] = useState(false);
   if (!game) return null;
+
+  function copyId() {
+    navigator.clipboard.writeText(game!.id).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2">
-      <div className="text-sm font-semibold text-brand">Love Cup 2026</div>
-      <div className="flex items-center gap-1 text-xs">
-        <span className="text-slate-400">当前玩家</span>
-        {game.players.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => setActivePlayer(p.id)}
-            className={`rounded-full px-2 py-1 font-medium ${
-              activePlayerId === p.id
-                ? "bg-brand text-white"
-                : "bg-slate-100 text-slate-600"
-            }`}
-          >
-            {p.name}
-          </button>
-        ))}
+    <div className="border-b border-slate-200 bg-white px-4 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-semibold text-brand">Love Cup 2026</div>
+        <div className="flex items-center gap-1 text-xs">
+          <span className="text-slate-400">当前玩家</span>
+          {game.players.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setActivePlayer(p.id)}
+              className={`rounded-full px-2 py-1 font-medium ${
+                activePlayerId === p.id
+                  ? "bg-brand text-white"
+                  : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mt-1 flex items-center gap-1 text-xs text-slate-400">
+        <span>对局 ID：{game.id}</span>
+        <button onClick={copyId} className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-500 hover:bg-slate-200">
+          {copied ? "已复制" : "复制"}
+        </button>
       </div>
     </div>
   );
