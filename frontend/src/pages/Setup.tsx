@@ -13,7 +13,6 @@ export default function Setup() {
   const [p1Pin, setP1Pin] = useState("");
   const [p2Pin, setP2Pin] = useState("");
   const [adminPin, setAdminPin] = useState("");
-  const [budget, setBudget] = useState("1000");
   const [err, setErr] = useState<string | null>(null);
   const [loadId, setLoadId] = useState("");
 
@@ -21,10 +20,6 @@ export default function Setup() {
     setErr(null);
     if (!p1.trim() || !p2.trim()) {
       setErr("两名玩家昵称都必须填写");
-      return;
-    }
-    if (Number(budget) < 0) {
-      setErr("预算必须为非负数");
       return;
     }
     if (adminPin.trim().length < 4) {
@@ -43,7 +38,6 @@ export default function Setup() {
         player1_pin: p1Pin.trim(),
         player2_pin: p2Pin.trim(),
         admin_pin: adminPin.trim(),
-        japan_budget_cny: budget,
       });
       setGameId(game.id);
       setActivePlayer(game.players[0].id);
@@ -105,14 +99,6 @@ export default function Setup() {
             value={adminPin}
             onChange={(e) => setAdminPin(e.target.value)}
             placeholder="修改赔率 / 删除对局时使用"
-          />
-        </Field>
-        <Field label="日本礼物预算上限（元）">
-          <Input
-            type="number"
-            value={budget}
-            onChange={(e) => setBudget(e.target.value)}
-            min={0}
           />
         </Field>
         <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
