@@ -13,6 +13,8 @@ class GameCreate(BaseModel):
     custom_id: Optional[str] = None
     player1_name: str = Field(min_length=1)
     player2_name: str = Field(min_length=1)
+    player1_pin: str
+    player2_pin: str
     admin_pin: Optional[str] = None
     japan_budget_cny: Decimal = Decimal("1000")
 
@@ -30,9 +32,17 @@ class GameCreate(BaseModel):
             raise ValueError("管理 PIN 至少 4 位")
         return v.strip() if v else None
 
+    @field_validator("player1_pin", "player2_pin")
+    @classmethod
+    def player_pin_valid(cls, v: str) -> str:
+        if len(v.strip()) < 4:
+            raise ValueError("玩家 PIN 至少 4 位")
+        return v.strip()
+
 
 class PredictionSubmit(BaseModel):
     player_id: str
+    player_pin: str
     wdl: WDL                       # 必填
     has_gd: bool = False
     sgd: Optional[int] = None

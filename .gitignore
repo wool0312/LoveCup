@@ -4,6 +4,7 @@ __pycache__/
 .env
 .env.local
 .pytest_cache/
+.vite/
 node_modules/
 dist/
 backend/static/

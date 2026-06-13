@@ -20,6 +20,15 @@ init_db()  # TestClient 不走 lifespan，显式建表
 client = TestClient(app)
 
 
+def _game_payload(player1_name: str = "a", player2_name: str = "b") -> dict:
+    return {
+        "player1_name": player1_name,
+        "player2_name": player2_name,
+        "player1_pin": "1111",
+        "player2_pin": "2222",
+    }
+
+
 def _future_kickoff_beijing_afternoon(days: int = 1) -> str:
     """构造一个未来比赛日下午的开赛时间（UTC ISO），保证锁定时刻在未来。"""
     beijing = dt.timezone(dt.timedelta(hours=8))
@@ -67,7 +76,7 @@ def _settle_match(match_id: str, home_goals: int, away_goals: int):
 
 def test_full_flow_group_double_underdog():
     # 1. 开局设置
-    r = client.post("/api/games", json={"player1_name": "wool", "player2_name": "mei"})
+    r = client.post("/api/games", json=_game_payload("wool", "mei"))
     assert r.status_code == 200, r.text
     game = r.json()
     gid = game["id"]
@@ -85,13 +94,13 @@ def test_full_flow_group_double_underdog():
 
     # 4. 两名玩家提交预测：p1 押客胜 0:1 + Double；p2 押主胜仅胜负
     r = client.post(f"/api/matches/{mid}/predictions", json={
-        "player_id": p1, "wdl": "客胜", "has_score": True,
+        "player_id": p1, "player_pin": "1111", "wdl": "客胜", "has_score": True,
         "pred_home": 0, "pred_away": 1, "use_double": True,
     })
     assert r.status_code == 200, r.text
     assert r.json()["bound_away_odds"] == "5.00"
     r = client.post(f"/api/matches/{mid}/predictions", json={
-        "player_id": p2, "wdl": "主胜",
+        "player_id": p2, "player_pin": "2222", "wdl": "主胜",
     })
     assert r.status_code == 200, r.text
 
@@ -114,7 +123,7 @@ def test_full_flow_group_double_underdog():
 
 
 def test_double_disabled_on_final():
-    r = client.post("/api/games", json={"player1_name": "a", "player2_name": "b"})
+    r = client.post("/api/games", json=_game_payload())
     game = r.json()
     gid = game["id"]
     p1 = game["players"][0]["id"]
@@ -125,14 +134,33 @@ def test_double_disabled_on_final():
     })
     # 决赛禁用 Double：提交 use_double=True 应被拒
     r = client.post(f"/api/matches/{mid}/predictions", json={
-        "player_id": p1, "wdl": "主胜", "use_double": True,
+        "player_id": p1, "player_pin": "1111", "wdl": "主胜", "use_double": True,
     })
     assert r.status_code == 422
     assert "决赛禁用" in r.text
 
 
+def test_prediction_requires_player_pin():
+    r = client.post("/api/games", json=_game_payload())
+    game = r.json()
+    gid = game["id"]
+    p1 = game["players"][0]["id"]
+    mid = _create_match(gid, days=2)
+
+    r = client.post(f"/api/matches/{mid}/predictions", json={
+        "player_id": p1, "player_pin": "wrong", "wdl": "主胜",
+    })
+    assert r.status_code == 403
+    assert "玩家 PIN" in r.text
+
+    r = client.post(f"/api/matches/{mid}/predictions", json={
+        "player_id": p1, "player_pin": "1111", "wdl": "主胜",
+    })
+    assert r.status_code == 200
+
+
 def test_one_double_per_match_day():
-    r = client.post("/api/games", json={"player1_name": "a", "player2_name": "b"})
+    r = client.post("/api/games", json=_game_payload())
     game = r.json()
     gid = game["id"]
     p1 = game["players"][0]["id"]
@@ -148,19 +176,19 @@ def test_one_double_per_match_day():
 
     # 第一场用 Double：成功
     r = client.post(f"/api/matches/{ids[0]}/predictions", json={
-        "player_id": p1, "wdl": "主胜", "use_double": True,
+        "player_id": p1, "player_pin": "1111", "wdl": "主胜", "use_double": True,
     })
     assert r.status_code == 200
     # 第二场也想用 Double：应被拒（每个比赛日至多一场）
     r = client.post(f"/api/matches/{ids[1]}/predictions", json={
-        "player_id": p1, "wdl": "主胜", "use_double": True,
+        "player_id": p1, "player_pin": "1111", "wdl": "主胜", "use_double": True,
     })
     assert r.status_code == 409
     assert "至多一场" in r.text
 
 
 def test_export_contains_standings():
-    r = client.post("/api/games", json={"player1_name": "a", "player2_name": "b"})
+    r = client.post("/api/games", json=_game_payload())
     gid = r.json()["id"]
     r = client.get(f"/api/games/{gid}/export")
     assert r.status_code == 200

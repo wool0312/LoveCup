@@ -33,8 +33,8 @@ function TopBar({ game, onExit }: { game: Game | null; onExit: () => void }) {
   }
 
   async function deleteGame() {
-    const adminPin = window.prompt("请输入管理 PIN，确认删除该对局");
-    if (!adminPin) return;
+    const adminPin = window.prompt("请输入管理 PIN，确认删除该对局。旧对局如未设置 PIN，可留空。");
+    if (adminPin === null) return;
     try {
       await api.deleteGame(game!.id, adminPin);
       setGameId(null);

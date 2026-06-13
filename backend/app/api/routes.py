@@ -46,12 +46,27 @@ def _pin_hash(game_id: str, pin: str) -> str:
     return hashlib.sha256(f"{game_id}:{pin}".encode("utf-8")).hexdigest()
 
 
+def _player_pin_hash(game_id: str, player_id: str, pin: str) -> str:
+    return hashlib.sha256(f"{game_id}:{player_id}:{pin}".encode("utf-8")).hexdigest()
+
+
 def _verify_admin_pin(game: e.Game, admin_pin: Optional[str]) -> None:
     # 兼容旧对局：没有 PIN 的历史对局先不拦截，否则用户会被锁在门外。
     if not game.admin_pin_hash:
         return
     if not admin_pin or not hmac.compare_digest(game.admin_pin_hash, _pin_hash(game.id, admin_pin)):
         raise HTTPException(403, "管理 PIN 错误")
+
+
+def _verify_player_pin(game: e.Game, player_id: str, player_pin: str) -> None:
+    if player_id == game.player1_id:
+        expected = game.player1_pin_hash
+    elif player_id == game.player2_id:
+        expected = game.player2_pin_hash
+    else:
+        raise HTTPException(404, "玩家不存在")
+    if not expected or not hmac.compare_digest(expected, _player_pin_hash(game.id, player_id, player_pin)):
+        raise HTTPException(403, "玩家 PIN 错误")
 
 
 def _bound_odds_payload(odds: Optional[e.OddsSnapshot]) -> dict:
@@ -94,12 +109,16 @@ def create_game(payload: GameCreate, db: Session = Depends(get_db)):
     game_id = payload.custom_id.strip() if payload.custom_id and payload.custom_id.strip() else _new_id("g")
     if db.get(e.Game, game_id):
         raise HTTPException(409, f"对局 ID「{game_id}」已存在，请换一个")
+    player1_id = _new_id("p")
+    player2_id = _new_id("p")
     game = e.Game(
         id=game_id,
-        player1_id=_new_id("p"),
-        player2_id=_new_id("p"),
+        player1_id=player1_id,
+        player2_id=player2_id,
         player1_name=payload.player1_name,
         player2_name=payload.player2_name,
+        player1_pin_hash=_player_pin_hash(game_id, player1_id, payload.player1_pin),
+        player2_pin_hash=_player_pin_hash(game_id, player2_id, payload.player2_pin),
         japan_budget_cny=payload.japan_budget_cny,
         admin_pin_hash=_pin_hash(game_id, payload.admin_pin) if payload.admin_pin else None,
         rule_version="v0.5",
@@ -241,6 +260,8 @@ def list_match_days(game_id: str, db: Session = Depends(get_db)):
 @router.post("/matches/{match_id}/predictions")
 def submit_prediction(match_id: str, payload: PredictionSubmit, db: Session = Depends(get_db)):
     m = _get_match(db, match_id)
+    game = db.get(e.Game, m.game_id)
+    _verify_player_pin(game, payload.player_id, payload.player_pin)
     if is_match_locked(m.kickoff_at):
         raise HTTPException(409, "已过锁定时刻（开赛前 1 小时），预测只读")
     if m.status in (e.MatchStatus.VOID, e.MatchStatus.SETTLED):

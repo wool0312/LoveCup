@@ -27,6 +27,8 @@ export const api = {
     custom_id?: string;
     player1_name: string;
     player2_name: string;
+    player1_pin: string;
+    player2_pin: string;
     admin_pin?: string;
     japan_budget_cny?: string;
   }) => req<Game>("/games", { method: "POST", body: JSON.stringify(body) }),
@@ -47,6 +49,7 @@ export const api = {
     matchId: string,
     body: {
       player_id: string;
+      player_pin: string;
       wdl: string;
       has_gd?: boolean;
       sgd?: number | null;

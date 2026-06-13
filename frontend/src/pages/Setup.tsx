@@ -10,6 +10,8 @@ export default function Setup() {
   const [customId, setCustomId] = useState("");
   const [p1, setP1] = useState("");
   const [p2, setP2] = useState("");
+  const [p1Pin, setP1Pin] = useState("");
+  const [p2Pin, setP2Pin] = useState("");
   const [adminPin, setAdminPin] = useState("");
   const [budget, setBudget] = useState("1000");
   const [err, setErr] = useState<string | null>(null);
@@ -29,11 +31,17 @@ export default function Setup() {
       setErr("管理 PIN 至少 4 位，用于修改赔率和删除对局");
       return;
     }
+    if (p1Pin.trim().length < 4 || p2Pin.trim().length < 4) {
+      setErr("两名玩家的 PIN 都至少 4 位");
+      return;
+    }
     try {
       const game = await api.createGame({
         custom_id: customId.trim() || undefined,
         player1_name: p1.trim(),
         player2_name: p2.trim(),
+        player1_pin: p1Pin.trim(),
+        player2_pin: p2Pin.trim(),
         admin_pin: adminPin.trim(),
         japan_budget_cny: budget,
       });
@@ -72,8 +80,24 @@ export default function Setup() {
         <Field label="玩家 1 昵称">
           <Input value={p1} onChange={(e) => setP1(e.target.value)} placeholder="例如 wool" />
         </Field>
+        <Field label="玩家 1 PIN（至少 4 位）">
+          <Input
+            type="password"
+            value={p1Pin}
+            onChange={(e) => setP1Pin(e.target.value)}
+            placeholder="玩家 1 提交预测时使用"
+          />
+        </Field>
         <Field label="玩家 2 昵称">
           <Input value={p2} onChange={(e) => setP2(e.target.value)} placeholder="例如 mei" />
+        </Field>
+        <Field label="玩家 2 PIN（至少 4 位）">
+          <Input
+            type="password"
+            value={p2Pin}
+            onChange={(e) => setP2Pin(e.target.value)}
+            placeholder="玩家 2 提交预测时使用"
+          />
         </Field>
         <Field label="管理 PIN（至少 4 位）">
           <Input

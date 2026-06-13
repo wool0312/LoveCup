@@ -83,6 +83,8 @@ class Game(Base):
     player2_id: Mapped[str] = mapped_column(String)
     player1_name: Mapped[str] = mapped_column(String)
     player2_name: Mapped[str] = mapped_column(String)
+    player1_pin_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    player2_pin_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     rule_version: Mapped[str] = mapped_column(String, default="v0.5")
     japan_budget_cny: Mapped[Decimal] = mapped_column(DecimalText, default=Decimal("1000"))
     admin_pin_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)

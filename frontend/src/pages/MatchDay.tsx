@@ -32,6 +32,7 @@ function PredictionForm({
   const [home, setHome] = useState<string>(existing?.pred_home?.toString() ?? "");
   const [away, setAway] = useState<string>(existing?.pred_away?.toString() ?? "");
   const [useDouble, setUseDouble] = useState(existing?.use_double ?? false);
+  const [playerPin, setPlayerPin] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
 
@@ -42,8 +43,13 @@ function PredictionForm({
   async function save() {
     setErr(null);
     setOk(false);
+    if (playerPin.trim().length < 4) {
+      setErr("请填写当前玩家 PIN");
+      return;
+    }
     const body: Parameters<typeof api.submitPrediction>[1] = {
       player_id: playerId,
+      player_pin: playerPin.trim(),
       wdl,
       use_double: useDouble,
     };
@@ -142,6 +148,15 @@ function PredictionForm({
           </>
         )}
       </div>
+
+      <Field label="当前玩家 PIN">
+        <Input
+          type="password"
+          value={playerPin}
+          onChange={(e) => setPlayerPin(e.target.value)}
+          placeholder="保存预测需要 PIN"
+        />
+      </Field>
 
       {err && <Banner tone="error">{err}</Banner>}
       {ok && <Banner tone="success">已保存</Banner>}

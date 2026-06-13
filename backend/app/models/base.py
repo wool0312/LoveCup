@@ -63,6 +63,8 @@ def _ensure_lightweight_migrations() -> None:
     tables = set(inspector.get_table_names())
     if "games" in tables:
         _add_column_if_missing("games", "admin_pin_hash", "VARCHAR")
+        _add_column_if_missing("games", "player1_pin_hash", "VARCHAR")
+        _add_column_if_missing("games", "player2_pin_hash", "VARCHAR")
     if "predictions" in tables:
         _add_column_if_missing("predictions", "bound_home_odds", _decimal_column_type())
         _add_column_if_missing("predictions", "bound_draw_odds", _decimal_column_type())
