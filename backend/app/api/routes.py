@@ -22,6 +22,7 @@ from ..schemas.schemas import (
     AdminAction,
     GameCreate,
     OddsSubmit,
+    PinUpdate,
     PredictionSubmit,
 )
 from ..services import settlement as settle
@@ -172,6 +173,44 @@ def delete_game(game_id: str, payload: AdminAction, db: Session = Depends(get_db
     db.delete(g)
     db.commit()
     return {"deleted": game_id}
+
+
+@router.post("/games/{game_id}/pins")
+def update_pins(game_id: str, payload: PinUpdate, db: Session = Depends(get_db)):
+    g = db.get(e.Game, game_id)
+    if g is None:
+        raise HTTPException(404, "对局不存在")
+    _verify_admin_pin(g, payload.admin_pin)
+
+    before = {
+        "admin_pin": bool(g.admin_pin_hash),
+        "player1_pin": bool(g.player1_pin_hash),
+        "player2_pin": bool(g.player2_pin_hash),
+    }
+    changed: list[str] = []
+    if payload.new_admin_pin:
+        g.admin_pin_hash = _pin_hash(g.id, payload.new_admin_pin)
+        changed.append("管理 PIN")
+    if payload.player1_pin:
+        g.player1_pin_hash = _player_pin_hash(g.id, g.player1_id, payload.player1_pin)
+        changed.append(g.player1_name)
+    if payload.player2_pin:
+        g.player2_pin_hash = _player_pin_hash(g.id, g.player2_id, payload.player2_pin)
+        changed.append(g.player2_name)
+    if not changed:
+        raise HTTPException(422, "至少填写一个新 PIN")
+
+    _audit(
+        db,
+        entity="Game",
+        entity_id=g.id,
+        actor="admin",
+        action="修改 PIN",
+        before=before,
+        after={"changed": changed},
+    )
+    db.commit()
+    return {"updated": changed}
 
 
 # ── 比赛查询 ──────────────────────────────────────────────

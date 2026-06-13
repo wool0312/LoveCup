@@ -38,6 +38,16 @@ export const api = {
   deleteGame: (gameId: string, adminPin: string) =>
     req(`/games/${gameId}`, { method: "DELETE", body: JSON.stringify({ admin_pin: adminPin }) }),
 
+  updatePins: (
+    gameId: string,
+    body: {
+      admin_pin: string;
+      new_admin_pin?: string;
+      player1_pin?: string;
+      player2_pin?: string;
+    }
+  ) => req<{ updated: string[] }>(`/games/${gameId}/pins`, { method: "POST", body: JSON.stringify(body) }),
+
   listMatchDays: (gameId: string) => req<MatchDay[]>(`/games/${gameId}/match-days`),
 
   listMatches: (gameId: string, matchDay?: string) =>

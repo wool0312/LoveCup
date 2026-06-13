@@ -71,3 +71,24 @@ class OddsSubmit(BaseModel):
 
 class AdminAction(BaseModel):
     admin_pin: Optional[str] = None
+
+
+class PinUpdate(BaseModel):
+    admin_pin: str
+    new_admin_pin: Optional[str] = None
+    player1_pin: Optional[str] = None
+    player2_pin: Optional[str] = None
+
+    @field_validator("admin_pin")
+    @classmethod
+    def current_admin_pin_valid(cls, v: str) -> str:
+        if len(v.strip()) < 4:
+            raise ValueError("管理 PIN 至少 4 位")
+        return v.strip()
+
+    @field_validator("new_admin_pin", "player1_pin", "player2_pin")
+    @classmethod
+    def new_pin_valid(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v.strip() and len(v.strip()) < 4:
+            raise ValueError("新 PIN 至少 4 位")
+        return v.strip() if v else None

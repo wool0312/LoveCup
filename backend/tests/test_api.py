@@ -26,6 +26,7 @@ def _game_payload(player1_name: str = "a", player2_name: str = "b") -> dict:
         "player2_name": player2_name,
         "player1_pin": "1111",
         "player2_pin": "2222",
+        "admin_pin": "9999",
     }
 
 
@@ -87,6 +88,7 @@ def test_full_flow_group_double_underdog():
 
     # 3. 录入赔率（客胜冷门 5.00）
     r = client.post(f"/api/matches/{mid}/odds", json={
+        "admin_pin": "9999",
         "recorded_by": "wool", "home_odds": "1.30", "draw_odds": "5.00",
         "away_odds": "5.00", "available": True, "source": "OddsPortal",
     })
@@ -106,6 +108,7 @@ def test_full_flow_group_double_underdog():
 
     # 5. 预测后修改赔率，结算仍应使用预测提交时绑定的 5.00
     r = client.post(f"/api/matches/{mid}/odds", json={
+        "admin_pin": "9999",
         "recorded_by": "wool", "home_odds": "1.30", "draw_odds": "3.00",
         "away_odds": "2.00", "available": True, "source": "OddsPortal",
     })
@@ -130,6 +133,7 @@ def test_double_disabled_on_final():
 
     mid = _create_match(gid, stage=e.Stage.FINAL, home="法国", away="阿根廷", days=2)
     client.post(f"/api/matches/{mid}/odds", json={
+        "admin_pin": "9999",
         "recorded_by": "a", "home_odds": "2.00", "draw_odds": "3.00", "away_odds": "3.50",
     })
     # 决赛禁用 Double：提交 use_double=True 应被拒
@@ -159,6 +163,37 @@ def test_prediction_requires_player_pin():
     assert r.status_code == 200
 
 
+def test_admin_can_reset_player_pin():
+    r = client.post("/api/games", json=_game_payload())
+    game = r.json()
+    gid = game["id"]
+    p1 = game["players"][0]["id"]
+    mid = _create_match(gid, days=2)
+
+    r = client.post(f"/api/games/{gid}/pins", json={
+        "admin_pin": "bad-pin",
+        "player1_pin": "3333",
+    })
+    assert r.status_code == 403
+
+    r = client.post(f"/api/games/{gid}/pins", json={
+        "admin_pin": "9999",
+        "player1_pin": "3333",
+    })
+    assert r.status_code == 200
+    assert "a" in r.json()["updated"]
+
+    r = client.post(f"/api/matches/{mid}/predictions", json={
+        "player_id": p1, "player_pin": "1111", "wdl": "主胜",
+    })
+    assert r.status_code == 403
+
+    r = client.post(f"/api/matches/{mid}/predictions", json={
+        "player_id": p1, "player_pin": "3333", "wdl": "主胜",
+    })
+    assert r.status_code == 200
+
+
 def test_one_double_per_match_day():
     r = client.post("/api/games", json=_game_payload())
     game = r.json()
@@ -171,6 +206,7 @@ def test_one_double_per_match_day():
         mid = _create_match(gid, home=home, away=away, days=3)
         ids.append(mid)
         client.post(f"/api/matches/{mid}/odds", json={
+            "admin_pin": "9999",
             "recorded_by": "a", "home_odds": "2.00", "draw_odds": "3.00", "away_odds": "3.50",
         })
 
