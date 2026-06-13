@@ -173,6 +173,9 @@ def _pred_dict(p: e.Prediction) -> dict:
 
 @router.get("/games/{game_id}/matches")
 def list_matches(game_id: str, match_day: Optional[str] = None, db: Session = Depends(get_db)):
+    from ..services.auto_result import maybe_fetch_and_settle
+
+    maybe_fetch_and_settle()
     q = select(e.Match).where(e.Match.game_id == game_id)
     if match_day:
         q = q.where(e.Match.match_day == dt.date.fromisoformat(match_day))

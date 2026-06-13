@@ -3,11 +3,10 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
+import time
 
 import httpx
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from ..models import entities as e
 from ..models.base import SessionLocal
@@ -17,6 +16,7 @@ log = logging.getLogger(__name__)
 
 API_BASE = "https://api.football-data.org/v4"
 API_TOKEN = os.getenv("FOOTBALL_DATA_API_TOKEN", "")
+_last_fetch_at = 0.0
 
 # football-data.org 英文队名 → 项目中文队名
 TEAM_NAME_MAP: dict[str, str] = {
@@ -75,15 +75,32 @@ def _cn(name: str) -> str:
     return TEAM_NAME_MAP.get(name, name)
 
 
-def _find_match(db: Session, home_cn: str, away_cn: str) -> Optional[e.Match]:
-    """根据中文主客队名找到未结算的比赛。"""
-    return db.scalar(
+def _api_token() -> str:
+    return os.getenv("FOOTBALL_DATA_API_TOKEN", API_TOKEN)
+
+
+def _find_matches(db, home_cn: str, away_cn: str) -> list[e.Match]:
+    """根据中文主客队名找到所有对局中尚未结算的同一场比赛。"""
+    return list(db.scalars(
         select(e.Match).where(
             e.Match.home_team == home_cn,
             e.Match.away_team == away_cn,
             e.Match.status.in_([e.MatchStatus.PENDING, e.MatchStatus.LOCKED]),
         )
-    )
+    ))
+
+
+def maybe_fetch_and_settle(min_interval_seconds: int = 60) -> dict:
+    """按需触发自动结算，避免页面刚打开时等后台定时任务。
+
+    多个前端请求可能连续触发这里，所以用进程内最小间隔做轻量节流。
+    """
+    global _last_fetch_at
+    now = time.time()
+    if now - _last_fetch_at < min_interval_seconds:
+        return {"checked": 0, "settled": [], "skipped": "throttled"}
+    _last_fetch_at = now
+    return fetch_and_settle()
 
 
 def fetch_and_settle() -> dict:
@@ -91,7 +108,8 @@ def fetch_and_settle() -> dict:
 
     返回 {"checked": N, "settled": [...]} 摘要。
     """
-    if not API_TOKEN:
+    token = _api_token()
+    if not token:
         log.warning("FOOTBALL_DATA_API_TOKEN 未设置，跳过自动结算")
         return {"checked": 0, "settled": [], "error": "no token"}
 
@@ -99,7 +117,7 @@ def fetch_and_settle() -> dict:
         resp = httpx.get(
             f"{API_BASE}/competitions/WC/matches",
             params={"status": "FINISHED"},
-            headers={"X-Auth-Token": API_TOKEN},
+            headers={"X-Auth-Token": token},
             timeout=15,
         )
         resp.raise_for_status()
@@ -127,33 +145,34 @@ def fetch_and_settle() -> dict:
             home_cn = _cn(home_en)
             away_cn = _cn(away_en)
 
-            m = _find_match(db, home_cn, away_cn)
-            if m is None:
+            matches = _find_matches(db, home_cn, away_cn)
+            if not matches:
                 continue
 
-            # 录入赛果
-            if m.status == e.MatchStatus.PENDING:
-                m.status = e.MatchStatus.LOCKED
-                m.locked_at = m.kickoff_at
-                for p in db.scalars(select(e.Prediction).where(e.Prediction.match_id == m.id)):
-                    p.locked_at = m.locked_at
+            for m in matches:
+                # 录入赛果
+                if m.status == e.MatchStatus.PENDING:
+                    m.status = e.MatchStatus.LOCKED
+                    m.locked_at = m.kickoff_at
+                    for p in db.scalars(select(e.Prediction).where(e.Prediction.match_id == m.id)):
+                        p.locked_at = m.locked_at
 
-            m.home_goals = home_goals
-            m.away_goals = away_goals
+                m.home_goals = home_goals
+                m.away_goals = away_goals
 
-            # 小组赛不需要 advanced_team；淘汰赛需要额外处理
-            if m.stage != e.Stage.GROUP:
-                winner = score.get("winner")
-                if winner == "HOME_TEAM":
-                    m.advanced_team = e.WDL.HOME
-                elif winner == "AWAY_TEAM":
-                    m.advanced_team = e.WDL.AWAY
-            db.flush()
+                # 小组赛不需要 advanced_team；淘汰赛需要额外处理
+                if m.stage != e.Stage.GROUP:
+                    winner = score.get("winner")
+                    if winner == "HOME_TEAM":
+                        m.advanced_team = e.WDL.HOME
+                    elif winner == "AWAY_TEAM":
+                        m.advanced_team = e.WDL.AWAY
+                db.flush()
 
-            settle.settle_match(db, m)
-            settle.recompute_standings(db, m.game_id)
-            settled_list.append(f"{home_cn} {home_goals}:{away_goals} {away_cn}")
-            log.info("自动结算: %s %d:%d %s", home_cn, home_goals, away_goals, away_cn)
+                settle.settle_match(db, m)
+                settle.recompute_standings(db, m.game_id)
+                settled_list.append(f"{home_cn} {home_goals}:{away_goals} {away_cn} ({m.game_id})")
+                log.info("自动结算: %s %d:%d %s (%s)", home_cn, home_goals, away_goals, away_cn, m.game_id)
 
     except Exception:
         db.rollback()
