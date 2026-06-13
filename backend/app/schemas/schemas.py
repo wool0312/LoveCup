@@ -57,15 +57,3 @@ class OddsSubmit(BaseModel):
         return v
 
 
-class ResultSubmit(BaseModel):
-    home_goals: int = Field(ge=0)       # 常规+加时（不含点球）
-    away_goals: int = Field(ge=0)
-    advanced_team: Optional[WDL] = None  # 淘汰赛晋级方（含点球）
-    actor: str
-
-
-class ManualOverride(BaseModel):
-    player_id: str
-    score: Decimal
-    reason: str = Field(min_length=1)
-    actor: str

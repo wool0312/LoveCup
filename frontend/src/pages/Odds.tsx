@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { useAppState } from "../store";
-import type { Game, Match, WDL } from "../types";
+import type { Game, Match } from "../types";
 import { Banner, Button, Card, Field, Input, Pill } from "../ui";
 
 function OddsEditor({ match, recorder, onSaved }: { match: Match; recorder: string; onSaved: () => void }) {
@@ -72,82 +72,6 @@ function OddsEditor({ match, recorder, onSaved }: { match: Match; recorder: stri
   );
 }
 
-function ResultEditor({ match, actor, onSaved }: { match: Match; actor: string; onSaved: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [h, setH] = useState(match.home_goals?.toString() ?? "");
-  const [a, setA] = useState(match.away_goals?.toString() ?? "");
-  const [adv, setAdv] = useState<WDL>(match.advanced_team ?? "主胜");
-  const [err, setErr] = useState<string | null>(null);
-  const isKnockout = match.stage !== "小组赛";
-
-  async function save() {
-    setErr(null);
-    if (h === "" || a === "") {
-      setErr("请填写双方进球数");
-      return;
-    }
-    try {
-      await api.submitResult(match.id, {
-        home_goals: Number(h),
-        away_goals: Number(a),
-        advanced_team: isKnockout ? adv : null,
-        actor,
-      });
-      setOpen(false);
-      onSaved();
-    } catch (e) {
-      setErr(String(e));
-    }
-  }
-
-  if (!open)
-    return (
-      <Button variant="soft" className="mt-2 w-full" onClick={() => setOpen(true)}>
-        {match.home_goals !== null ? "修改赛果" : "录入赛果并结算"}
-      </Button>
-    );
-
-  return (
-    <div className="mt-2 space-y-2 rounded-xl bg-slate-50 p-3">
-      <div className="flex items-end gap-2">
-        <Field label={`${match.home_team}（加时后，不含点球）`}>
-          <Input type="number" min={0} value={h} onChange={(e) => setH(e.target.value)} />
-        </Field>
-        <span className="pb-2">:</span>
-        <Field label={`${match.away_team}`}>
-          <Input type="number" min={0} value={a} onChange={(e) => setA(e.target.value)} />
-        </Field>
-      </div>
-      {isKnockout && (
-        <Field label="最终晋级方（含点球）">
-          <div className="flex gap-2">
-            {(["主胜", "客胜"] as WDL[]).map((w) => (
-              <button
-                key={w}
-                onClick={() => setAdv(w)}
-                className={`rounded-lg px-3 py-1 text-sm ${
-                  adv === w ? "bg-brand text-white" : "bg-white border border-slate-200 text-slate-600"
-                }`}
-              >
-                {w === "主胜" ? match.home_team : match.away_team}
-              </button>
-            ))}
-          </div>
-        </Field>
-      )}
-      {err && <Banner tone="error">{err}</Banner>}
-      <div className="flex gap-2">
-        <Button onClick={save} className="flex-1">
-          保存并结算
-        </Button>
-        <Button variant="ghost" onClick={() => setOpen(false)}>
-          取消
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export default function Odds({ game }: { game: Game }) {
   const { activePlayerId } = useAppState();
   const [matches, setMatches] = useState<Match[]>([]);
@@ -161,7 +85,7 @@ export default function Odds({ game }: { game: Game }) {
   return (
     <div className="space-y-3">
       <Banner tone="info">
-        每场比赛在开赛前 1 小时锁定（北京时间），锁定后赔率与预测不可改。两名玩家均可录入赔率与赛果，操作记入留痕。
+        每场比赛在开赛前 1 小时锁定（北京时间），锁定后赔率与预测不可改。赛果由系统自动获取并结算。
       </Banner>
       {matches.map((m) => (
         <Card key={m.id}>
@@ -177,7 +101,11 @@ export default function Odds({ game }: { game: Game }) {
             {m.stage} · 锁定 {new Date(m.lock_time_beijing).toLocaleString("zh-CN")}
           </div>
           <OddsEditor match={m} recorder={recorder} onSaved={reload} />
-          <ResultEditor match={m} actor={recorder} onSaved={reload} />
+          {m.status === "已结算" && m.home_goals !== null && (
+            <div className="mt-2 text-sm text-slate-500">
+              赛果：{m.home_team} {m.home_goals} : {m.away_goals} {m.away_team}（自动结算）
+            </div>
+          )}
         </Card>
       ))}
     </div>

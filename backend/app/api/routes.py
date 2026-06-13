@@ -19,11 +19,9 @@ from ..models import entities as e
 from ..models.base import SessionLocal
 from ..schemas.schemas import (
     GameCreate,
-    ManualOverride,
     MatchCreate,
     OddsSubmit,
     PredictionSubmit,
-    ResultSubmit,
 )
 from ..services import settlement as settle
 
@@ -317,39 +315,6 @@ def _do_lock(db: Session, m: e.Match) -> dict:
     return _match_dict(db, m)
 
 
-# ── 赛果录入与结算（PRD §7.4 / §8.2）────────────────────
-
-@router.post("/matches/{match_id}/result")
-def submit_result(match_id: str, payload: ResultSubmit, db: Session = Depends(get_db)):
-    m = _get_match(db, match_id)
-    if m.status == e.MatchStatus.VOID:
-        raise HTTPException(409, "比赛已作废")
-    if m.stage != e.Stage.GROUP and payload.advanced_team is None:
-        raise HTTPException(422, "淘汰赛必须指定最终晋级方（advanced_team）")
-
-    before = {"home_goals": m.home_goals, "away_goals": m.away_goals,
-              "advanced_team": m.advanced_team.value if m.advanced_team else None}
-    # 录入赛果前先确保已锁定（赛后录入，PRD §8.2）
-    if m.status == e.MatchStatus.PENDING:
-        _do_lock(db, m)
-    m.home_goals = payload.home_goals
-    m.away_goals = payload.away_goals
-    m.advanced_team = payload.advanced_team
-    _audit(db, entity="Match", entity_id=m.id, actor=payload.actor, action="录入赛果",
-           before=before, after={"home_goals": m.home_goals, "away_goals": m.away_goals,
-                                 "advanced_team": payload.advanced_team.value if payload.advanced_team else None})
-    db.commit()
-
-    scores = settle.settle_match(db, m)
-    standings = settle.recompute_standings(db, m.game_id)
-    return {
-        "match": _match_dict(db, m),
-        "scores": [{"player_id": s.player_id, "mode": s.mode.value, "score": str(s.score),
-                    "breakdown": json.loads(s.breakdown) if s.breakdown else None} for s in scores],
-        "standings": standings,
-    }
-
-
 # ── 异常处理（PRD §9）────────────────────────────────────
 
 @router.post("/matches/{match_id}/void")
@@ -382,27 +347,6 @@ def postpone_match(match_id: str, actor: str, new_kickoff: str, reason: str = ""
                                  "match_day": m.match_day.isoformat()}, reason=reason)
     db.commit()
     return _match_dict(db, m)
-
-
-@router.post("/matches/{match_id}/override")
-def override_score(match_id: str, payload: ManualOverride, db: Session = Depends(get_db)):
-    m = _get_match(db, match_id)
-    ms = db.scalar(select(e.MatchScore).where(
-        e.MatchScore.match_id == match_id, e.MatchScore.player_id == payload.player_id))
-    before = {"score": str(ms.score)} if ms else None
-    if ms is None:
-        ms = e.MatchScore(match_id=match_id, player_id=payload.player_id,
-                          mode=e.ScoreMode.NORMAL, score=payload.score)
-        db.add(ms)
-    ms.score = payload.score
-    ms.manual_override = True
-    ms.override_reason = payload.reason
-    _audit(db, entity="MatchScore", entity_id=f"{match_id}:{payload.player_id}",
-           actor=payload.actor, action="人工改分", before=before,
-           after={"score": str(payload.score)}, reason=payload.reason)
-    db.commit()
-    settle.recompute_standings(db, m.game_id)
-    return {"player_id": ms.player_id, "score": str(ms.score), "manual_override": True}
 
 
 # ── 实时积分 / 历史 / 导出（PRD §7.4 / §7.5 / §7.6）─────

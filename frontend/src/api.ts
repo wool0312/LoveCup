@@ -77,11 +77,6 @@ export const api = {
     }
   ) => req<Match>(`/matches/${matchId}/odds`, { method: "POST", body: JSON.stringify(body) }),
 
-  submitResult: (
-    matchId: string,
-    body: { home_goals: number; away_goals: number; advanced_team?: string | null; actor: string }
-  ) => req(`/matches/${matchId}/result`, { method: "POST", body: JSON.stringify(body) }),
-
   standings: (gameId: string) => req<Standings>(`/games/${gameId}/standings`),
 
   history: (gameId: string) => req<Match[]>(`/games/${gameId}/history`),
