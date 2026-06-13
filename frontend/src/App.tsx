@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, HashRouter, Routes } from "react-router-dom";
 import { api } from "./api";
-import { setActivePlayer, useAppState } from "./store";
+import { setActivePlayer, setGameId, useAppState } from "./store";
 import type { Game } from "./types";
 import Setup from "./pages/Setup";
 import MatchDay from "./pages/MatchDay";
