@@ -163,6 +163,41 @@ def test_prediction_requires_player_pin():
     assert r.status_code == 200
 
 
+def test_predictions_hidden_until_match_lock():
+    r = client.post("/api/games", json=_game_payload("wool", "meiyi"))
+    game = r.json()
+    gid = game["id"]
+    p1, p2 = game["players"][0]["id"], game["players"][1]["id"]
+    mid = _create_match(gid, days=2)
+
+    r = client.post(f"/api/matches/{mid}/predictions", json={
+        "player_id": p1, "player_pin": "1111", "wdl": "主胜",
+    })
+    assert r.status_code == 200
+    r = client.post(f"/api/matches/{mid}/predictions", json={
+        "player_id": p2, "player_pin": "2222", "wdl": "客胜",
+    })
+    assert r.status_code == 200
+
+    r = client.get(f"/api/games/{gid}/matches")
+    assert r.status_code == 200
+    listed = {m["id"]: m for m in r.json()}
+    assert listed[mid]["predictions"] == []
+
+    r = client.get(f"/api/games/{gid}/matches", params={"player_id": p1})
+    assert r.status_code == 200
+    listed = {m["id"]: m for m in r.json()}
+    visible = listed[mid]["predictions"]
+    assert [p["player_id"] for p in visible] == [p1]
+
+    r = client.post(f"/api/matches/{mid}/lock")
+    assert r.status_code == 200
+    r = client.get(f"/api/games/{gid}/matches", params={"player_id": p1})
+    listed = {m["id"]: m for m in r.json()}
+    visible = listed[mid]["predictions"]
+    assert {p["player_id"] for p in visible} == {p1, p2}
+
+
 def test_admin_can_reset_player_pin():
     r = client.post("/api/games", json=_game_payload())
     game = r.json()

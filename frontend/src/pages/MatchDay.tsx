@@ -249,10 +249,10 @@ export default function MatchDay({ game }: { game: Game }) {
 
   function reload() {
     api.listMatchDays(game.id).then(setDays);
-    api.listMatches(game.id, selected === "all" ? undefined : selected).then(setMatches);
+    api.listMatches(game.id, selected === "all" ? undefined : selected, activePlayerId).then(setMatches);
   }
 
-  useEffect(reload, [game.id, selected]);
+  useEffect(reload, [game.id, selected, activePlayerId]);
 
   const nameOf = (id: string) => game.players.find((p) => p.id === id)?.name ?? id;
   const beijingToday = todayBeijing();
@@ -375,7 +375,7 @@ export default function MatchDay({ game }: { game: Game }) {
               <p className="text-xs text-slate-400">无预测记录</p>
             )}
             {m.predictions
-              .filter((p) => m.locked || p.player_id !== activePlayerId)
+              .filter((p) => m.locked || p.player_id === activePlayerId)
               .map((p) => (
                 <PredictionView key={p.player_id} pred={p} name={nameOf(p.player_id)} />
               ))}

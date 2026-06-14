@@ -215,9 +215,19 @@ def update_pins(game_id: str, payload: PinUpdate, db: Session = Depends(get_db))
 
 # ── 比赛查询 ──────────────────────────────────────────────
 
-def _match_dict(db: Session, m: e.Match) -> dict:
+def _prediction_visible_to_viewer(m: e.Match, p: e.Prediction, viewer_player_id: Optional[str]) -> bool:
+    if m.status != e.MatchStatus.PENDING or is_match_locked(m.kickoff_at):
+        return True
+    return viewer_player_id is not None and p.player_id == viewer_player_id
+
+
+def _match_dict(db: Session, m: e.Match, viewer_player_id: Optional[str] = None) -> dict:
     odds = m.odds
-    preds = list(db.scalars(select(e.Prediction).where(e.Prediction.match_id == m.id)))
+    preds = [
+        p
+        for p in db.scalars(select(e.Prediction).where(e.Prediction.match_id == m.id))
+        if _prediction_visible_to_viewer(m, p, viewer_player_id)
+    ]
     sp = stage_points(CoreStage(m.stage.value))
     return {
         "id": m.id,
@@ -267,7 +277,12 @@ def _pred_dict(p: e.Prediction) -> dict:
 
 
 @router.get("/games/{game_id}/matches")
-def list_matches(game_id: str, match_day: Optional[str] = None, db: Session = Depends(get_db)):
+def list_matches(
+    game_id: str,
+    match_day: Optional[str] = None,
+    player_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
     from ..services.auto_result import maybe_fetch_and_settle
 
     maybe_fetch_and_settle()
@@ -275,7 +290,7 @@ def list_matches(game_id: str, match_day: Optional[str] = None, db: Session = De
     if match_day:
         q = q.where(e.Match.match_day == dt.date.fromisoformat(match_day))
     matches = list(db.scalars(q.order_by(e.Match.kickoff_at)))
-    return [_match_dict(db, m) for m in matches]
+    return [_match_dict(db, m, player_id) for m in matches]
 
 
 @router.get("/games/{game_id}/match-days")

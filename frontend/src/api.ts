@@ -50,10 +50,13 @@ export const api = {
 
   listMatchDays: (gameId: string) => req<MatchDay[]>(`/games/${gameId}/match-days`),
 
-  listMatches: (gameId: string, matchDay?: string) =>
-    req<Match[]>(
-      `/games/${gameId}/matches${matchDay ? `?match_day=${matchDay}` : ""}`
-    ),
+  listMatches: (gameId: string, matchDay?: string, playerId?: string | null) => {
+    const params = new URLSearchParams();
+    if (matchDay) params.set("match_day", matchDay);
+    if (playerId) params.set("player_id", playerId);
+    const query = params.toString();
+    return req<Match[]>(`/games/${gameId}/matches${query ? `?${query}` : ""}`);
+  },
 
   submitPrediction: (
     matchId: string,
