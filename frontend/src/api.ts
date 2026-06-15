@@ -63,7 +63,7 @@ export const api = {
     body: {
       player_id: string;
       player_pin: string;
-      wdl: string;
+      wdl?: string;
       has_gd?: boolean;
       sgd?: number | null;
       has_score?: boolean;

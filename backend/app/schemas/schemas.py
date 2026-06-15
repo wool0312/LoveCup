@@ -43,13 +43,20 @@ class GameCreate(BaseModel):
 class PredictionSubmit(BaseModel):
     player_id: str
     player_pin: str
-    wdl: WDL                       # 必填
+    wdl: Optional[WDL] = None
     has_gd: bool = False
     sgd: Optional[int] = None
     has_score: bool = False
     pred_home: Optional[int] = None
     pred_away: Optional[int] = None
     use_double: bool = False
+
+    @field_validator("pred_home", "pred_away")
+    @classmethod
+    def score_non_negative(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v < 0:
+            raise ValueError("比分不能为负数")
+        return v
 
 
 class OddsSubmit(BaseModel):

@@ -25,6 +25,16 @@ def _core_wdl(w: e.WDL) -> sc.WDL:
     return sc.WDL(w.value)
 
 
+def _prediction_wdl(pred: e.Prediction) -> e.WDL:
+    if pred.has_score and pred.pred_home is not None and pred.pred_away is not None:
+        if pred.pred_home > pred.pred_away:
+            return e.WDL.HOME
+        if pred.pred_home < pred.pred_away:
+            return e.WDL.AWAY
+        return e.WDL.DRAW
+    return pred.wdl
+
+
 def _core_stage(s: e.Stage) -> CoreStage:
     return CoreStage(s.value)
 
@@ -40,8 +50,8 @@ def _build_result(match: e.Match) -> sc.MatchResult:
 
 
 def _build_prediction(p: e.Prediction) -> sc.Prediction:
-    return sc.Prediction(
-        wdl=_core_wdl(p.wdl),
+    return sc.Prediction.from_raw(
+        _core_wdl(_prediction_wdl(p)),
         has_gd=p.has_gd,
         sgd=p.sgd,
         has_score=p.has_score,
@@ -80,7 +90,7 @@ def compute_match_score(
         return Decimal(0), e.ScoreMode.NORMAL, None, {"reason": "未提交预测，计 0 分"}
 
     core_pred = _build_prediction(pred)
-    odds_used = _odds_for(pred.wdl, pred, odds)
+    odds_used = _odds_for(_prediction_wdl(pred), pred, odds)
     odds_available = odds_used is not None
 
     use_double = pred.use_double and odds_available and not sp.is_final
@@ -169,6 +179,20 @@ def settle_match(db: Session, match: e.Match) -> List[e.MatchScore]:
     match.status = e.MatchStatus.SETTLED
     db.commit()
     return results
+
+
+def refresh_settled_matches(db: Session, game_id: str) -> None:
+    """按当前规则复算已结算比赛的非人工分数。"""
+    matches = list(db.scalars(
+        select(e.Match).where(
+            e.Match.game_id == game_id,
+            e.Match.status == e.MatchStatus.SETTLED,
+            e.Match.home_goals.is_not(None),
+            e.Match.away_goals.is_not(None),
+        )
+    ))
+    for match in matches:
+        settle_match(db, match)
 
 
 # ── 轮次与最终结算 ────────────────────────────────────────

@@ -86,6 +86,20 @@ def _bound_odds_payload(odds: Optional[e.OddsSnapshot]) -> dict:
     }
 
 
+def _wdl_from_score(home: int, away: int) -> e.WDL:
+    if home > away:
+        return e.WDL.HOME
+    if home < away:
+        return e.WDL.AWAY
+    return e.WDL.DRAW
+
+
+def _prediction_wdl_for_display(p: e.Prediction) -> e.WDL:
+    if p.has_score and p.pred_home is not None and p.pred_away is not None:
+        return _wdl_from_score(p.pred_home, p.pred_away)
+    return p.wdl
+
+
 def _audit(db: Session, *, entity: str, entity_id: str, actor: str, action: str,
            before=None, after=None, reason: Optional[str] = None) -> None:
     db.add(e.AuditLog(
@@ -259,9 +273,10 @@ def _match_dict(db: Session, m: e.Match, viewer_player_id: Optional[str] = None)
 
 
 def _pred_dict(p: e.Prediction) -> dict:
+    wdl = _prediction_wdl_for_display(p)
     return {
         "player_id": p.player_id,
-        "wdl": p.wdl.value,
+        "wdl": wdl.value,
         "has_gd": p.has_gd,
         "sgd": p.sgd,
         "has_score": p.has_score,
@@ -323,6 +338,8 @@ def submit_prediction(match_id: str, payload: PredictionSubmit, db: Session = De
 
     if payload.has_score and (payload.pred_home is None or payload.pred_away is None):
         raise HTTPException(422, "选择精确比分时必须填写双方比分")
+    if not payload.has_score and payload.wdl is None:
+        raise HTTPException(422, "必须填写比分，或提供胜平负")
 
     sp = stage_points(CoreStage(m.stage.value))
     use_double = payload.use_double
@@ -349,9 +366,11 @@ def submit_prediction(match_id: str, payload: PredictionSubmit, db: Session = De
     # 精确比分自动推导净胜球
     has_gd = payload.has_gd
     sgd = payload.sgd
+    wdl = payload.wdl
     if payload.has_score:
         has_gd = True
         sgd = payload.pred_home - payload.pred_away
+        wdl = _wdl_from_score(payload.pred_home, payload.pred_away)
 
     existing = db.scalar(
         select(e.Prediction).where(
@@ -360,7 +379,7 @@ def submit_prediction(match_id: str, payload: PredictionSubmit, db: Session = De
         )
     )
     if existing:
-        existing.wdl = payload.wdl
+        existing.wdl = wdl
         existing.has_gd = has_gd
         existing.sgd = sgd
         existing.has_score = payload.has_score
@@ -375,7 +394,7 @@ def submit_prediction(match_id: str, payload: PredictionSubmit, db: Session = De
         pred = e.Prediction(
             match_id=match_id,
             player_id=payload.player_id,
-            wdl=payload.wdl,
+            wdl=wdl,
             has_gd=has_gd,
             sgd=sgd,
             has_score=payload.has_score,
@@ -496,11 +515,13 @@ def postpone_match(match_id: str, actor: str, new_kickoff: str, reason: str = ""
 def get_standings(game_id: str, db: Session = Depends(get_db)):
     if db.get(e.Game, game_id) is None:
         raise HTTPException(404, "对局不存在")
+    settle.refresh_settled_matches(db, game_id)
     return settle.recompute_standings(db, game_id)
 
 
 @router.get("/games/{game_id}/history")
 def get_history(game_id: str, db: Session = Depends(get_db)):
+    settle.refresh_settled_matches(db, game_id)
     matches = list(db.scalars(
         select(e.Match).where(e.Match.game_id == game_id).order_by(e.Match.kickoff_at)))
     out = []

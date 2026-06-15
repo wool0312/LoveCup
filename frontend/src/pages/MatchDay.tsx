@@ -3,8 +3,6 @@ import { api } from "../api";
 import { useAppState } from "../store";
 import type { Game, Match, MatchDay as MatchDayT, Prediction, WDL } from "../types";
 import { Banner, Button, Card, Field, Input, Pill } from "../ui";
-const WDLS: WDL[] = ["主胜", "平", "客胜"];
-type Mode = "wdl" | "gd" | "score";
 type MatchFilter = "all" | "today" | "pending" | "mine_unpredicted" | "settled";
 
 const FILTERS: { value: MatchFilter; label: string }[] = [
@@ -35,6 +33,19 @@ function todayBeijing() {
   return `${value("year")}-${value("month")}-${value("day")}`;
 }
 
+function wdlFromScore(home: number, away: number): WDL {
+  if (home > away) return "主胜";
+  if (home < away) return "客胜";
+  return "平";
+}
+
+function predictionWdl(pred: Prediction): WDL {
+  if (pred.has_score && pred.pred_home !== null && pred.pred_away !== null) {
+    return wdlFromScore(pred.pred_home, pred.pred_away);
+  }
+  return pred.wdl;
+}
+
 function PredictionForm({
   match,
   playerId,
@@ -45,10 +56,6 @@ function PredictionForm({
   onSaved: () => void;
 }) {
   const existing = match.predictions.find((p) => p.player_id === playerId);
-  const initMode: Mode = existing?.has_score ? "score" : existing?.has_gd ? "gd" : "wdl";
-  const [wdl, setWdl] = useState<WDL>(existing?.wdl ?? "主胜");
-  const [mode, setMode] = useState<Mode>(initMode);
-  const [sgd, setSgd] = useState<string>(existing?.sgd?.toString() ?? "0");
   const [home, setHome] = useState<string>(existing?.pred_home?.toString() ?? "");
   const [away, setAway] = useState<string>(existing?.pred_away?.toString() ?? "");
   const [useDouble, setUseDouble] = useState(existing?.use_double ?? false);
@@ -67,24 +74,25 @@ function PredictionForm({
       setErr("请填写当前玩家 PIN");
       return;
     }
+    if (home === "" || away === "") {
+      setErr("请填写预测比分");
+      return;
+    }
+    const predHome = Number(home);
+    const predAway = Number(away);
+    if (!Number.isInteger(predHome) || !Number.isInteger(predAway) || predHome < 0 || predAway < 0) {
+      setErr("比分必须是非负整数");
+      return;
+    }
     const body: Parameters<typeof api.submitPrediction>[1] = {
       player_id: playerId,
       player_pin: playerPin.trim(),
-      wdl,
+      wdl: wdlFromScore(predHome, predAway),
+      has_score: true,
+      pred_home: predHome,
+      pred_away: predAway,
       use_double: useDouble,
     };
-    if (mode === "gd") {
-      body.has_gd = true;
-      body.sgd = Number(sgd);
-    } else if (mode === "score") {
-      if (home === "" || away === "") {
-        setErr("精确比分需要填写双方进球数");
-        return;
-      }
-      body.has_score = true;
-      body.pred_home = Number(home);
-      body.pred_away = Number(away);
-    }
     try {
       await api.submitPrediction(match.id, body);
       setOk(true);
@@ -96,52 +104,19 @@ function PredictionForm({
 
   return (
     <div className="mt-3 space-y-3 rounded-xl bg-slate-50 p-3">
-      <div className="flex flex-wrap gap-1">
-        {WDLS.map((w) => (
-          <button
-            key={w}
-            onClick={() => setWdl(w)}
-            className={`rounded-lg px-3 py-1 text-sm ${
-              wdl === w ? "bg-brand text-white" : "bg-white text-slate-600 border border-slate-200"
-            }`}
-          >
-            {w}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap gap-1 text-xs">
-        {([
-          ["wdl", "只猜胜平负"],
-          ["gd", "+净胜球"],
-          ["score", "精确比分"],
-        ] as [Mode, string][]).map(([m, label]) => (
-          <button
-            key={m}
-            onClick={() => setMode(m)}
-            className={`rounded-lg px-2 py-1 ${
-              mode === m ? "bg-slate-800 text-white" : "bg-white text-slate-500 border border-slate-200"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {mode === "gd" && (
-        <Field label="净胜球（主−客，可负）">
-          <Input type="number" value={sgd} onChange={(e) => setSgd(e.target.value)} />
+      <div className="flex items-end gap-2">
+        <Field label={`${match.home_team} 进球`}>
+          <Input type="number" min={0} step={1} value={home} onChange={(e) => setHome(e.target.value)} />
         </Field>
-      )}
-      {mode === "score" && (
-        <div className="flex items-end gap-2">
-          <Field label={`${match.home_team} 进球`}>
-            <Input type="number" min={0} value={home} onChange={(e) => setHome(e.target.value)} />
-          </Field>
-          <span className="pb-2 text-slate-400">:</span>
-          <Field label={`${match.away_team} 进球`}>
-            <Input type="number" min={0} value={away} onChange={(e) => setAway(e.target.value)} />
-          </Field>
+        <span className="pb-2 text-slate-400">:</span>
+        <Field label={`${match.away_team} 进球`}>
+          <Input type="number" min={0} step={1} value={away} onChange={(e) => setAway(e.target.value)} />
+        </Field>
+      </div>
+
+      {home !== "" && away !== "" && Number.isInteger(Number(home)) && Number.isInteger(Number(away)) && (
+        <div className="text-xs text-slate-500">
+          系统将自动判定为：{wdlFromScore(Number(home), Number(away))}，净胜球 {Number(home) - Number(away)}。
         </div>
       )}
 
@@ -164,7 +139,7 @@ function PredictionForm({
         {useDouble && oddsAvailable && (
           <>
             {" "}
-            Double 押中 = 本金 {sp.w} ×（赔率−1）+命中加分；押错 = −{sp.w}。
+            Double 会跟随比分自动判定的胜平负；押中 = 本金 {sp.w} ×（赔率−1）+命中加分，押错 = −{sp.w}。
           </>
         )}
       </div>
@@ -188,11 +163,12 @@ function PredictionForm({
 }
 
 function PredictionView({ pred, name }: { pred: Prediction; name: string }) {
-  let detail = pred.wdl;
+  const effectiveWdl = predictionWdl(pred);
+  let detail = effectiveWdl;
   if (pred.has_score) detail += ` · 比分 ${pred.pred_home}:${pred.pred_away}`;
   else if (pred.has_gd) detail += ` · 净胜球 ${pred.sgd}`;
   const boundOdds =
-    pred.wdl === "主胜" ? pred.bound_home_odds : pred.wdl === "平" ? pred.bound_draw_odds : pred.bound_away_odds;
+    effectiveWdl === "主胜" ? pred.bound_home_odds : effectiveWdl === "平" ? pred.bound_draw_odds : pred.bound_away_odds;
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-slate-500">{name}</span>

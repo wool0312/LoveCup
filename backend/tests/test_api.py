@@ -8,6 +8,7 @@ _tmpdir = tempfile.mkdtemp()
 os.environ["LOVECUP_DATABASE_URL"] = f"sqlite:///{_tmpdir}/test.db"
 
 from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import select  # noqa: E402
 
 from app.main import app  # noqa: E402
 from app.core.stages import round_of, Stage as CoreStage  # noqa: E402
@@ -123,6 +124,51 @@ def test_full_flow_group_double_underdog():
     assert scores[p1]["mode"] == e.ScoreMode.DOUBLE
     # p2：押主胜错 → 0
     assert scores[p2]["score"] == Decimal(0)
+
+
+def test_score_prediction_derives_wdl_even_if_stored_wdl_is_wrong():
+    r = client.post("/api/games", json=_game_payload("wool", "meiyi"))
+    game = r.json()
+    gid = game["id"]
+    p1, p2 = game["players"][0]["id"], game["players"][1]["id"]
+    mid = _create_match(gid, home="瑞典", away="突尼斯", days=2)
+
+    db = SessionLocal()
+    try:
+        for player_id in (p1, p2):
+            db.add(e.Prediction(
+                match_id=mid,
+                player_id=player_id,
+                # 旧错误数据：比分 2:1 是主胜，但 wdl 误存成客胜。
+                wdl=e.WDL.AWAY,
+                has_gd=True,
+                sgd=1,
+                has_score=True,
+                pred_home=2,
+                pred_away=1,
+            ))
+        db.commit()
+    finally:
+        db.close()
+
+    scores = _settle_match(mid, 5, 1)
+    from decimal import Decimal
+
+    assert scores[p1]["score"] == Decimal(1)
+    assert scores[p2]["score"] == Decimal(1)
+
+    db = SessionLocal()
+    try:
+        for ms in db.scalars(select(e.MatchScore).where(e.MatchScore.match_id == mid)):
+            ms.score = Decimal(0)
+        db.commit()
+    finally:
+        db.close()
+
+    r = client.get(f"/api/games/{gid}/history")
+    assert r.status_code == 200
+    match = next(m for m in r.json() if m["id"] == mid)
+    assert {s["player_id"]: s["score"] for s in match["scores"]} == {p1: "1", p2: "1"}
 
 
 def test_double_disabled_on_final():
