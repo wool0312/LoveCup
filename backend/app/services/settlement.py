@@ -112,7 +112,7 @@ def compute_match_score(
             "odds": str(odds_used),
             "odds_source": pred.bound_odds_source or (odds.source if odds else None),
             "wdl_correct": wdl_correct,
-            "base": str(sp.stake * (odds_used - 1)) if wdl_correct else str(-sp.stake),
+            "base": str(sp.stake * odds_used) if wdl_correct else str(-sp.stake),
             "gd_bonus": str(sp.gd) if gd_hit else "0",
             "score_bonus": str(sp.sc) if score_hit else "0",
             "total": str(score),

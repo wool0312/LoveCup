@@ -139,7 +139,7 @@ function PredictionForm({
         {useDouble && oddsAvailable && (
           <>
             {" "}
-            Double 会跟随比分自动判定的胜平负；押中 = 本金 {sp.w} ×（赔率−1）+命中加分，押错 = −{sp.w}。
+            Double 会跟随比分自动判定的胜平负；押中 = 本金 {sp.w} × 赔率 + 命中加分，押错 = −{sp.w}。
           </>
         )}
       </div>

@@ -124,7 +124,7 @@ def score_double(
     stake = sp.stake
     if pred.wdl != result.wdl:
         return -stake  # 押错，亏本金
-    s = stake * (odds - Decimal(1))  # 押中，净赚（本金 ×（赔率−1））
+    s = stake * odds  # 押中，按十进制赔率返还（本金 × 赔率）
     if pred.has_gd and pred.sgd == result.sgd:
         s += sp.gd  # 净胜球按普通分照加（不乘赔率）
     if pred.has_score and pred.pred_home == result.home and pred.pred_away == result.away:

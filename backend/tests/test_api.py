@@ -118,8 +118,8 @@ def test_full_flow_group_double_underdog():
     # 6. 自动赛果服务写入 0:1（客胜冷门命中）
     scores = _settle_match(mid, 0, 1)
     from decimal import Decimal
-    # p1：Double 押中冷门 = 1×(5.00−1) + 净胜球1 + 精确比分2 = 7（PRD §6 #5）
-    assert scores[p1]["score"] == Decimal(7)
+    # p1：Double 押中冷门 = 1×5.00 + 净胜球1 + 精确比分2 = 8
+    assert scores[p1]["score"] == Decimal(8)
     assert scores[p1]["odds_used"] == Decimal("5.00")
     assert scores[p1]["mode"] == e.ScoreMode.DOUBLE
     # p2：押主胜错 → 0

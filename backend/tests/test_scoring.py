@@ -60,13 +60,13 @@ def test_case4_group_wdl_wrong():
 
 def test_case5_group_double_underdog_hit():
     """#5 小组赛·Double 押中冷门：押客胜 odds=5.00，预测 0:1 实际 0:1
-    → 普通 4 / Double 7。"""
+    → 普通 4 / Double 8。"""
     pred = Prediction.from_raw(
         WDL.AWAY, has_score=True, pred_home=0, pred_away=1, use_double=True
     )
     result = MatchResult.from_goals(0, 1)
     assert score_normal(pred, result, GROUP) == D(4)
-    assert score_double(pred, result, GROUP, D("5.00")) == D(7)
+    assert score_double(pred, result, GROUP, D("5.00")) == D(8)
 
 
 def test_case6_group_double_wrong():
@@ -79,19 +79,19 @@ def test_case6_group_double_wrong():
 
 def test_case7_group_double_low_odds_favorite():
     """#7 小组赛·Double 押低赔热门：押主胜 odds=1.30，仅胜负，实际主胜
-    → 普通 1 / Double 0.30。"""
+    → 普通 1 / Double 1.30。"""
     pred = Prediction.from_raw(WDL.HOME, use_double=True)
     result = MatchResult.from_goals(2, 0)
     assert score_normal(pred, result, GROUP) == D(1)
-    assert score_double(pred, result, GROUP, D("1.30")) == D("0.30")
+    assert score_double(pred, result, GROUP, D("1.30")) == D("1.30")
 
 
 def test_case8_qf_double_hit():
-    """#8 8强·Double 押中：本金 8，odds=3.00，仅胜负，命中 → 普通 8 / Double 16。"""
+    """#8 8强·Double 押中：本金 8，odds=3.00，仅胜负，命中 → 普通 8 / Double 24。"""
     pred = Prediction.from_raw(WDL.HOME, use_double=True)
     result = MatchResult.from_knockout(1, 0, advanced_home=True)
     assert score_normal(pred, result, QF) == D(8)
-    assert score_double(pred, result, QF, D("3.00")) == D(16)
+    assert score_double(pred, result, QF, D("3.00")) == D(24)
 
 
 def test_case9_final_double_disabled():
@@ -140,4 +140,4 @@ def test_match_score_double_active_path():
     pred = Prediction.from_raw(WDL.HOME, use_double=True)
     result = MatchResult.from_goals(2, 0)
     got = match_score(pred, result, GROUP, odds=D("1.30"), odds_available=True)
-    assert got == D("0.30")
+    assert got == D("1.30")
