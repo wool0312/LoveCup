@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { Game, Match } from "../types";
 import { Banner, Card, Pill } from "../ui";
+import { StageBadge, TeamName } from "../worldCup";
+import { teamWithFlag } from "../worldCupData";
 
 const BREAKDOWN_LABELS: Record<string, string> = {
   reason: "说明",
@@ -74,13 +76,13 @@ export default function History({ game }: { game: Game }) {
           href={api.exportUrl(game.id)}
           target="_blank"
           rel="noreferrer"
-          className="flex-1 rounded-xl bg-rose-50 py-2 text-center text-sm font-medium text-brand"
+          className="flex-1 rounded-lg bg-emerald-50 py-2 text-center text-sm font-medium text-brand"
         >
           导出 JSON
         </a>
         <a
           href={api.exportCsvUrl(game.id)}
-          className="flex-1 rounded-xl bg-rose-50 py-2 text-center text-sm font-medium text-brand"
+          className="flex-1 rounded-lg bg-emerald-50 py-2 text-center text-sm font-medium text-brand"
         >
           导出 CSV
         </a>
@@ -89,23 +91,30 @@ export default function History({ game }: { game: Game }) {
       {settled.length === 0 && <Banner tone="info">还没有已结算的比赛。</Banner>}
 
       {settled.map((m) => (
-        <Card key={m.id}>
-          <div className="flex items-center justify-between">
-            <div className="font-semibold">
-              {m.home_team} {m.home_goals}:{m.away_goals} {m.away_team}
+        <Card key={m.id} className="border-emerald-900/15">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="mb-2 flex items-center gap-2">
+                <StageBadge stage={m.stage} />
+                <span className="text-xs text-slate-400">锁定 {new Date(m.lock_time_beijing).toLocaleString("zh-CN")}</span>
+              </div>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-lg bg-emerald-950 px-3 py-2 text-white">
+                <span className="min-w-0 text-sm font-semibold"><TeamName team={m.home_team} /></span>
+                <span className="font-mono text-xl font-bold text-cup-gold">{m.home_goals}:{m.away_goals}</span>
+                <span className="min-w-0 text-sm font-semibold"><TeamName team={m.away_team} /></span>
+              </div>
             </div>
-            <Pill tone="green">{m.stage}</Pill>
+            <Pill tone="green">已结算</Pill>
           </div>
           <div className="text-xs text-slate-400">
-            锁定 {new Date(m.lock_time_beijing).toLocaleString("zh-CN")}
             {m.odds?.available &&
-              ` · 赔率快照 ${m.odds.home_odds}/${m.odds.draw_odds}/${m.odds.away_odds}`}
-            {m.advanced_team && ` · 晋级 ${m.advanced_team}`}
+              `赔率快照 ${m.odds.home_odds}/${m.odds.draw_odds}/${m.odds.away_odds}`}
+            {m.advanced_team && ` · 晋级 ${teamWithFlag(m.advanced_team === "主胜" ? m.home_team : m.away_team)}`}
           </div>
 
           <div className="mt-2 space-y-2">
             {m.scores?.map((s) => (
-              <div key={s.player_id} className="rounded-xl bg-slate-50 p-2">
+              <div key={s.player_id} className="rounded-lg bg-emerald-50/70 p-2 ring-1 ring-emerald-100">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium">
                     {nameOf(s.player_id)}{" "}
@@ -119,7 +128,7 @@ export default function History({ game }: { game: Game }) {
                     {breakdownEntries(s.breakdown).map((item) => (
                       <span
                         key={item.key}
-                        className="rounded-lg bg-white px-2 py-1 text-[11px] text-slate-500 ring-1 ring-slate-100"
+                        className="rounded-lg bg-white px-2 py-1 text-[11px] text-slate-500 ring-1 ring-emerald-100"
                       >
                         <span className="text-slate-400">{item.label}：</span>
                         <span className="font-medium text-slate-600">{item.value}</span>

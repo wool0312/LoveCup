@@ -32,8 +32,11 @@ export default function Standings({ game }: { game: Game }) {
 
   return (
     <div className="space-y-3">
-      <Card>
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">最终加权积分</h2>
+      <Card className="border-emerald-900/15">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-700">最终加权积分</h2>
+          <span className="rounded-md bg-cup-deep px-2 py-1 text-xs font-semibold text-cup-gold">🏆 TABLE</span>
+        </div>
         {[
           { p: p1, s: s1, f: f1 },
           { p: p2, s: s2, f: f2 },
@@ -41,13 +44,13 @@ export default function Standings({ game }: { game: Game }) {
           <div key={p.id} className="mb-3">
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium">
-                {p.name} {isChamp(p.id) && <Pill tone="amber">👑 领先</Pill>}
+                {p.name} {isChamp(p.id) && <Pill tone="amber">领先</Pill>}
               </span>
               <span className="font-mono font-semibold">{s.final_score}</span>
             </div>
-            <div className="mt-1 h-2 rounded-full bg-slate-100">
+            <div className="mt-1 h-2 rounded-full bg-emerald-50">
               <div
-                className="h-2 rounded-full bg-brand"
+                className="h-2 rounded-full bg-[linear-gradient(90deg,#0f766e,#f6c453)]"
                 style={{ width: `${Math.max((Math.abs(f) / max) * 100, 2)}%` }}
               />
             </div>
@@ -60,11 +63,11 @@ export default function Standings({ game }: { game: Game }) {
         )}
       </Card>
 
-      <Card>
+      <Card className="border-emerald-900/15">
         <h2 className="mb-2 text-sm font-semibold text-slate-700">各轮净积分</h2>
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-xs text-slate-400">
+            <tr className="text-xs text-emerald-700">
               <th className="text-left font-normal">轮次</th>
               <th className="text-left font-normal">权重</th>
               <th className="text-right font-normal">{p1.name}</th>
@@ -73,7 +76,7 @@ export default function Standings({ game }: { game: Game }) {
           </thead>
           <tbody>
             {ROUNDS.map((r) => (
-              <tr key={r} className="border-t border-slate-100">
+              <tr key={r} className="border-t border-emerald-100">
                 <td className="py-1.5">{r}</td>
                 <td className="text-slate-400">{WEIGHTS[r]}</td>
                 <td className="text-right font-mono">{s1.round_nets[r]}</td>

@@ -62,11 +62,14 @@ export default function Setup() {
   return (
     <div className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-4 p-6">
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-brand">Love Cup 2026</h1>
-        <p className="mt-1 text-sm text-slate-500">情侣世界杯竞猜积分游戏 · 规则 v0.5</p>
+        <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-cup-deep text-3xl text-cup-gold shadow-inner">
+          ⚽
+        </div>
+        <h1 className="text-2xl font-bold text-cup-deep">Love Cup 2026</h1>
+        <p className="mt-1 text-sm text-emerald-700">情侣世界杯竞猜积分游戏 · 规则 v0.5</p>
       </div>
 
-      <Card className="space-y-3">
+      <Card className="space-y-3 border-emerald-900/15">
         <h2 className="text-sm font-semibold text-slate-700">开局设置</h2>
         <Field label="对局 ID（可选，留空自动生成）">
           <Input value={customId} onChange={(e) => setCustomId(e.target.value)} placeholder="例如 love2026" />
@@ -101,7 +104,7 @@ export default function Setup() {
             placeholder="修改赔率 / 删除对局时使用"
           />
         </Field>
-        <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
+        <div className="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800">
           规则版本 <b>v0.5</b> 一经确认锁定，不可中途修改。轮次权重 7 / 15 / 16 / 18 / 20 / 24（%）。
         </div>
         {err && <Banner tone="error">{err}</Banner>}
@@ -110,7 +113,7 @@ export default function Setup() {
         </Button>
       </Card>
 
-      <Card className="space-y-2">
+      <Card className="space-y-2 border-emerald-900/15">
         <h2 className="text-sm font-semibold text-slate-700">或载入已有对局</h2>
         <div className="flex gap-2">
           <Input

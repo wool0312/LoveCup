@@ -3,6 +3,8 @@ import { api } from "../api";
 import { useAppState } from "../store";
 import type { Game, Match, MatchDay as MatchDayT, Prediction, WDL } from "../types";
 import { Banner, Button, Card, Field, Input, Pill } from "../ui";
+import { StageBadge, TeamName } from "../worldCup";
+import { teamWithFlag } from "../worldCupData";
 type MatchFilter = "all" | "today" | "pending" | "mine_unpredicted" | "settled";
 
 const FILTERS: { value: MatchFilter; label: string }[] = [
@@ -103,13 +105,13 @@ function PredictionForm({
   }
 
   return (
-    <div className="mt-3 space-y-3 rounded-xl bg-slate-50 p-3">
+    <div className="mt-3 space-y-3 rounded-lg bg-emerald-50/70 p-3 ring-1 ring-emerald-100">
       <div className="flex items-end gap-2">
-        <Field label={`${match.home_team} 进球`}>
+        <Field label={<><TeamName team={match.home_team} /> 进球</>}>
           <Input type="number" min={0} step={1} value={home} onChange={(e) => setHome(e.target.value)} />
         </Field>
         <span className="pb-2 text-slate-400">:</span>
-        <Field label={`${match.away_team} 进球`}>
+        <Field label={<><TeamName team={match.away_team} /> 进球</>}>
           <Input type="number" min={0} step={1} value={away} onChange={(e) => setAway(e.target.value)} />
         </Field>
       </div>
@@ -195,7 +197,7 @@ function EditablePrediction({
 
   if (!editing && existing) {
     return (
-      <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
+      <div className="mt-3 space-y-2 rounded-lg bg-emerald-50/70 p-3 ring-1 ring-emerald-100">
         <PredictionView pred={existing} name={playerName} />
         <Button variant="soft" className="w-full" onClick={() => setEditing(true)}>
           修改预测
@@ -266,8 +268,8 @@ export default function MatchDay({ game }: { game: Game }) {
       <div className="flex flex-wrap gap-1">
         <button
           onClick={() => selectDay("all")}
-          className={`rounded-lg px-3 py-1 text-xs ${
-            selected === "all" ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"
+          className={`rounded-lg border px-3 py-1 text-xs font-medium ${
+            selected === "all" ? "border-cup-deep bg-cup-deep text-white" : "border-emerald-100 bg-white/80 text-emerald-800"
           }`}
         >
           全部
@@ -276,22 +278,22 @@ export default function MatchDay({ game }: { game: Game }) {
           <button
             key={d.match_day}
             onClick={() => selectDay(d.match_day)}
-            className={`rounded-lg px-3 py-1 text-xs ${
-              selected === d.match_day ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"
+            className={`rounded-lg border px-3 py-1 text-xs font-medium ${
+              selected === d.match_day ? "border-cup-deep bg-cup-deep text-white" : "border-emerald-100 bg-white/80 text-emerald-800"
             }`}
           >
-            {d.match_day.slice(5)} {d.locked ? "🔒" : ""}
+            <span className="text-cup-gold">▰</span> {d.match_day.slice(5)} {d.locked ? "🔒" : ""}
           </button>
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-1 rounded-xl bg-white p-2 shadow-sm ring-1 ring-slate-100">
+      <div className="flex flex-wrap gap-1 rounded-lg bg-white/95 p-2 shadow-sm ring-1 ring-emerald-900/10">
         {FILTERS.map((item) => (
           <button
             key={item.value}
             onClick={() => selectFilter(item.value)}
             className={`rounded-lg px-3 py-1 text-xs font-medium ${
-              filter === item.value ? "bg-brand text-white" : "bg-slate-100 text-slate-600"
+              filter === item.value ? "bg-brand text-white" : "bg-emerald-50 text-emerald-800"
             }`}
           >
             {item.label}
@@ -308,36 +310,46 @@ export default function MatchDay({ game }: { game: Game }) {
       )}
 
       {filteredMatches.map((m) => (
-        <Card key={m.id}>
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="font-semibold">
-                {m.home_team} <span className="text-slate-300">vs</span> {m.away_team}
+        <Card key={m.id} className="overflow-hidden border-emerald-900/15 p-0">
+          <div className="bg-[linear-gradient(135deg,#064e3b,#0f766e)] px-4 py-3 text-white">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="mb-2 flex items-center gap-2">
+                  <StageBadge stage={m.stage} />
+                  <span className="text-[11px] text-emerald-100">{m.round}</span>
+                </div>
+                <div className="flex min-w-0 items-center gap-2 text-base font-semibold">
+                  <TeamName team={m.home_team} className="min-w-0" />
+                  <span className="shrink-0 text-cup-gold">vs</span>
+                  <TeamName team={m.away_team} className="min-w-0" />
+                </div>
+                <div className="mt-1 text-xs text-emerald-100">
+                  开赛 {fmtTime(m.kickoff_beijing)} · 锁定 {fmtTime(m.lock_time_beijing)}
+                </div>
               </div>
-              <div className="mt-0.5 text-xs text-slate-400">
-                {m.stage} · {m.round} · 开赛 {fmtTime(m.kickoff_beijing)}
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <Pill tone={m.status === "已结算" ? "green" : m.locked ? "amber" : "slate"}>
+                  {m.status}
+                </Pill>
+                {m.odds?.available && (
+                  <span className="rounded bg-white/10 px-2 py-0.5 text-[11px] text-emerald-50">
+                    赔率 {m.odds.home_odds}/{m.odds.draw_odds}/{m.odds.away_odds}
+                  </span>
+                )}
               </div>
-              <div className="text-xs text-slate-400">锁定 {fmtTime(m.lock_time_beijing)}</div>
-            </div>
-            <div className="flex flex-col items-end gap-1">
-              <Pill tone={m.status === "已结算" ? "green" : m.locked ? "amber" : "slate"}>
-                {m.status}
-              </Pill>
-              {m.odds?.available && (
-                <span className="text-[11px] text-slate-400">
-                  赔率 {m.odds.home_odds}/{m.odds.draw_odds}/{m.odds.away_odds}
-                </span>
-              )}
             </div>
           </div>
 
+          <div className="p-4">
           {m.home_goals !== null && (
-            <div className="mt-2 flex items-center justify-center gap-3 rounded-lg bg-green-50 py-2 text-center">
-              <span className="font-semibold text-green-800">{m.home_team}</span>
-              <span className="text-xl font-bold text-green-700">{m.home_goals} : {m.away_goals}</span>
-              <span className="font-semibold text-green-800">{m.away_team}</span>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-950 px-3 py-3 text-center text-white shadow-inner">
+              <span className="min-w-0 text-sm font-semibold text-emerald-50"><TeamName team={m.home_team} /></span>
+              <span className="rounded bg-black/25 px-3 py-1 font-mono text-2xl font-bold text-cup-gold">{m.home_goals} : {m.away_goals}</span>
+              <span className="min-w-0 text-sm font-semibold text-emerald-50"><TeamName team={m.away_team} /></span>
               {m.advanced_team && (
-                <Pill tone="green">晋级 {m.advanced_team === "主胜" ? m.home_team : m.away_team}</Pill>
+                <div className="col-span-3 mt-1">
+                  <Pill tone="green">晋级 {teamWithFlag(m.advanced_team === "主胜" ? m.home_team : m.away_team)}</Pill>
+                </div>
               )}
             </div>
           )}
@@ -346,7 +358,7 @@ export default function MatchDay({ game }: { game: Game }) {
             <EditablePrediction match={m} playerId={activePlayerId} playerName={nameOf(activePlayerId)} onSaved={reload} />
           ) : null}
 
-          <div className="mt-3 space-y-1 border-t border-slate-100 pt-2">
+          <div className="mt-3 space-y-1 border-t border-emerald-100 pt-2">
             {m.predictions.length === 0 && (
               <p className="text-xs text-slate-400">无预测记录</p>
             )}
@@ -355,6 +367,7 @@ export default function MatchDay({ game }: { game: Game }) {
               .map((p) => (
                 <PredictionView key={p.player_id} pred={p} name={nameOf(p.player_id)} />
               ))}
+          </div>
           </div>
         </Card>
       ))}

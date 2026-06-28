@@ -26,15 +26,17 @@ export default function Final({ game }: { game: Game }) {
 
   return (
     <div className="space-y-3">
-      <Card className="text-center">
-        <div className="text-4xl">🏆</div>
-        <h2 className="mt-1 text-lg font-bold text-brand">
+      <Card className="border-emerald-900/15 bg-[linear-gradient(160deg,#ffffff,#ecfdf5)] text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-cup-deep text-4xl shadow-inner">
+          🏆
+        </div>
+        <h2 className="mt-2 text-lg font-bold text-brand">
           {data.is_tie ? "并列冠军" : "总冠军"}
         </h2>
         <p className="mt-1 text-2xl font-semibold">{champNames}</p>
         <div className="mt-3 flex justify-center gap-4 text-sm">
           {game.players.map((p) => (
-            <div key={p.id}>
+            <div key={p.id} className="rounded-lg bg-white/80 px-4 py-2 ring-1 ring-emerald-100">
               <div className="text-slate-400">{p.name}</div>
               <div className="font-mono font-semibold">
                 {data.players[p.id].final_score}
@@ -49,7 +51,7 @@ export default function Final({ game }: { game: Game }) {
         )}
       </Card>
 
-      <Card className="space-y-2">
+      <Card className="space-y-2 border-emerald-900/15">
         <h3 className="text-sm font-semibold text-slate-700">奖励</h3>
         <p className="text-sm text-slate-600">
           🎁 日本旅行礼物奖励（预算上限 {game.japan_budget_cny} 元人民币）
@@ -68,7 +70,7 @@ export default function Final({ game }: { game: Game }) {
         </Card>
       )}
 
-      <Card className="space-y-2">
+      <Card className="space-y-2 border-emerald-900/15">
         <h3 className="text-sm font-semibold text-slate-700">冠军颁奖仪式</h3>
         <p className="text-xs text-slate-500">
           主持人：{host.name}（最终积分较低者）。仪式至少包括以下环节：

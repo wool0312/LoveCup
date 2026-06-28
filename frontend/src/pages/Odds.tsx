@@ -3,6 +3,7 @@ import { api } from "../api";
 import { useAppState } from "../store";
 import type { Game, Match } from "../types";
 import { Banner, Button, Card, Field, Input, Pill } from "../ui";
+import { StageBadge, TeamName } from "../worldCup";
 
 function OddsEditor({ match, recorder, onSaved }: { match: Match; recorder: string; onSaved: () => void }) {
   const [h, setH] = useState(match.odds?.home_odds ?? "");
@@ -49,7 +50,7 @@ function OddsEditor({ match, recorder, onSaved }: { match: Match; recorder: stri
   }
 
   return (
-    <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
+    <div className="mt-3 space-y-2 rounded-lg bg-emerald-50/70 p-3 ring-1 ring-emerald-100">
       <div className="grid grid-cols-3 gap-2">
         <Field label="主胜">
           <Input type="number" step="0.01" min="1" value={h} onChange={(e) => setH(e.target.value)} />
@@ -102,22 +103,27 @@ export default function Odds({ game }: { game: Game }) {
         每场比赛在开赛前 1 小时锁定（北京时间），锁定后赔率与预测不可改。赛果由系统自动获取并结算。
       </Banner>
       {matches.map((m) => (
-        <Card key={m.id}>
-          <div className="flex items-center justify-between">
-            <div className="font-semibold">
-              {m.home_team} <span className="text-slate-300">vs</span> {m.away_team}
+        <Card key={m.id} className="border-emerald-900/15">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="mb-1 flex items-center gap-2">
+                <StageBadge stage={m.stage} />
+                <span className="text-xs text-slate-400">锁定 {new Date(m.lock_time_beijing).toLocaleString("zh-CN")}</span>
+              </div>
+              <div className="flex min-w-0 items-center gap-2 font-semibold">
+                <TeamName team={m.home_team} />
+                <span className="text-cup-gold">vs</span>
+                <TeamName team={m.away_team} />
+              </div>
             </div>
             <Pill tone={m.status === "已结算" ? "green" : m.locked ? "amber" : "slate"}>
               {m.status}
             </Pill>
           </div>
-          <div className="text-xs text-slate-400">
-            {m.stage} · 锁定 {new Date(m.lock_time_beijing).toLocaleString("zh-CN")}
-          </div>
           <OddsEditor match={m} recorder={recorder} onSaved={reload} />
           {m.status === "已结算" && m.home_goals !== null && (
-            <div className="mt-2 text-sm text-slate-500">
-              赛果：{m.home_team} {m.home_goals} : {m.away_goals} {m.away_team}（自动结算）
+            <div className="mt-2 rounded-lg bg-emerald-950 px-3 py-2 text-center text-sm text-emerald-50">
+              <TeamName team={m.home_team} /> <span className="font-mono font-bold text-cup-gold">{m.home_goals} : {m.away_goals}</span> <TeamName team={m.away_team} />
             </div>
           )}
         </Card>

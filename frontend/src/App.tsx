@@ -11,11 +11,11 @@ import History from "./pages/History";
 import Final from "./pages/Final";
 
 const NAV = [
-  { to: "/matchday", label: "比赛日" },
-  { to: "/odds", label: "赔率" },
-  { to: "/standings", label: "积分" },
-  { to: "/history", label: "历史" },
-  { to: "/final", label: "颁奖" },
+  { to: "/matchday", label: "比赛日", icon: "⚽" },
+  { to: "/odds", label: "赔率", icon: "📈" },
+  { to: "/standings", label: "积分", icon: "🏆" },
+  { to: "/history", label: "历史", icon: "📋" },
+  { to: "/final", label: "颁奖", icon: "🥇" },
 ];
 
 function PinSettings({ game, onClose }: { game: Game; onClose: () => void }) {
@@ -138,9 +138,19 @@ function TopBar({ game, onExit }: { game: Game | null; onExit: () => void }) {
   }
 
   return (
-    <div className="border-b border-slate-200 bg-white px-4 py-2">
+    <div className="border-b border-emerald-900/10 bg-white/95 px-4 py-3 shadow-sm shadow-emerald-900/5">
       <div className="flex items-center justify-between gap-2">
-        <div className="text-sm font-semibold text-brand">Love Cup 2026</div>
+        <div>
+          <div className="flex items-center gap-2 text-sm font-bold text-cup-deep">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-cup-deep text-sm text-cup-gold">
+              ⚽
+            </span>
+            <span>Love Cup 2026</span>
+          </div>
+          <div className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-emerald-700">
+            World Cup Match Center
+          </div>
+        </div>
         <div className="flex items-center gap-1 text-xs">
           <span className="text-slate-400">当前玩家</span>
           {game.players.map((p) => (
@@ -149,8 +159,8 @@ function TopBar({ game, onExit }: { game: Game | null; onExit: () => void }) {
               onClick={() => setActivePlayer(p.id)}
               className={`rounded-full px-2 py-1 font-medium ${
                 activePlayerId === p.id
-                  ? "bg-brand text-white"
-                  : "bg-slate-100 text-slate-600"
+                  ? "bg-cup-deep text-white shadow-sm"
+                  : "bg-emerald-50 text-emerald-800"
               }`}
             >
               {p.name}
@@ -161,12 +171,12 @@ function TopBar({ game, onExit }: { game: Game | null; onExit: () => void }) {
       <div className="mt-1 flex items-center justify-between text-xs">
         <div className="flex items-center gap-1 text-slate-400">
           <span>对局 ID：{game.id}</span>
-          <button onClick={copyId} className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-500 hover:bg-slate-200">
+          <button onClick={copyId} className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700 hover:bg-emerald-100">
             {copied ? "已复制" : "复制"}
           </button>
         </div>
         <div className="relative">
-          <button onClick={() => setShowMenu(!showMenu)} className="rounded bg-slate-100 px-2 py-0.5 text-slate-500 hover:bg-slate-200">
+          <button onClick={() => setShowMenu(!showMenu)} className="rounded bg-emerald-50 px-2 py-0.5 text-emerald-700 hover:bg-emerald-100">
             ···
           </button>
           {showMenu && (
@@ -201,22 +211,36 @@ function Shell() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     if (!gameId) {
-      setGame(null);
-      return;
+      queueMicrotask(() => {
+        if (!cancelled) setGame(null);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
-    setLoading(true);
+    queueMicrotask(() => {
+      if (!cancelled) setLoading(true);
+    });
     api
       .getGame(gameId)
       .then((g) => {
+        if (cancelled) return;
         setGame(g);
         if (!activePlayerId) setActivePlayer(g.players[0].id);
       })
       .catch(() => {
+        if (cancelled) return;
         setGame(null);
         setGameId(null);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [gameId, activePlayerId]);
 
   if (!gameId) {
@@ -250,18 +274,19 @@ function Shell() {
           <Route path="*" element={<Navigate to="/matchday" replace />} />
         </Routes>
       </main>
-      <nav className="fixed inset-x-0 bottom-0 mx-auto flex max-w-xl justify-around border-t border-slate-200 bg-white py-2">
+      <nav className="fixed inset-x-0 bottom-0 mx-auto flex max-w-xl justify-around border-t border-emerald-900/10 bg-white/95 px-2 py-2 shadow-[0_-10px_30px_rgba(6,78,59,0.08)] backdrop-blur">
         {NAV.map((n) => (
           <NavLink
             key={n.to}
             to={n.to}
             className={({ isActive }) =>
-              `rounded-lg px-3 py-1 text-xs font-medium ${
-                isActive ? "text-brand" : "text-slate-400"
+              `flex min-w-14 flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-xs font-medium ${
+                isActive ? "bg-emerald-50 text-brand" : "text-slate-400"
               }`
             }
           >
-            {n.label}
+            <span className="text-base leading-none">{n.icon}</span>
+            <span>{n.label}</span>
           </NavLink>
         ))}
       </nav>
