@@ -26,7 +26,7 @@ from ..schemas.schemas import (
     PredictionSubmit,
 )
 from ..services import settlement as settle
-from ..services.match_sync import populate_matches
+from ..services.match_sync import maybe_sync_matches, populate_matches
 
 router = APIRouter()
 
@@ -300,6 +300,7 @@ def list_matches(
 ):
     from ..services.auto_result import maybe_fetch_and_settle
 
+    maybe_sync_matches()
     maybe_fetch_and_settle()
     q = select(e.Match).where(e.Match.game_id == game_id)
     if match_day:
@@ -310,6 +311,7 @@ def list_matches(
 
 @router.get("/games/{game_id}/match-days")
 def list_match_days(game_id: str, db: Session = Depends(get_db)):
+    maybe_sync_matches()
     matches = list(db.scalars(select(e.Match).where(e.Match.game_id == game_id)))
     by_day: dict[dt.date, list[e.Match]] = {}
     for m in matches:

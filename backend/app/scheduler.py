@@ -1,6 +1,7 @@
 """定时任务：自动锁定 + 自动结算。"""
 from __future__ import annotations
 
+import datetime as dt
 import logging
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -47,9 +48,9 @@ def _auto_settle() -> None:
 
 
 def _sync_matches() -> None:
-    from .services.match_sync import sync_all_games
+    from .services.match_sync import maybe_sync_matches
     try:
-        result = sync_all_games()
+        result = maybe_sync_matches(min_interval_seconds=0)
         if result.get("changes"):
             log.info("赛程同步: %s", result["changes"])
     except Exception:
@@ -60,8 +61,15 @@ def start_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is None:
         _scheduler = BackgroundScheduler(timezone="UTC")
+        run_now = dt.datetime.now(dt.timezone.utc)
         _scheduler.add_job(_auto_lock_due_matches, "interval", minutes=1, id="auto_lock")
         _scheduler.add_job(_auto_settle, "interval", minutes=5, id="auto_settle")
-        _scheduler.add_job(_sync_matches, "interval", minutes=30, id="sync_matches")
+        _scheduler.add_job(
+            _sync_matches,
+            "interval",
+            minutes=30,
+            id="sync_matches",
+            next_run_time=run_now,
+        )
         _scheduler.start()
     return _scheduler

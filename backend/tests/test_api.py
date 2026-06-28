@@ -16,6 +16,7 @@ from app.core.timeutil import match_day_of  # noqa: E402
 from app.models import entities as e  # noqa: E402
 from app.models.base import init_db, SessionLocal  # noqa: E402
 from app.services import settlement as settle  # noqa: E402
+from app.services import match_sync  # noqa: E402
 
 init_db()  # TestClient 不走 lifespan，显式建表
 client = TestClient(app)
@@ -290,6 +291,35 @@ def test_group_fixtures_keep_group_rounds():
     assert rounds[("墨西哥", "南非")] == "第1轮"
     assert rounds[("捷克", "南非")] == "第2轮"
     assert rounds[("捷克", "墨西哥")] == "第3轮"
+
+
+def test_match_days_syncs_knockout_schedule_on_read(monkeypatch):
+    r = client.post("/api/games", json=_game_payload())
+    gid = r.json()["id"]
+
+    def fake_fetch_api_matches():
+        return [
+            {
+                "stage": "LAST_32",
+                "utcDate": "2026-06-28T20:00:00Z",
+                "homeTeam": {"name": "Argentina"},
+                "awayTeam": {"name": "France"},
+            }
+        ]
+
+    monkeypatch.setattr(match_sync, "fetch_api_matches", fake_fetch_api_matches)
+    match_sync._last_sync_at = 0.0
+
+    r = client.get(f"/api/games/{gid}/match-days")
+    assert r.status_code == 200, r.text
+    assert any(d["match_day"] == "2026-06-29" for d in r.json())
+
+    r = client.get(f"/api/games/{gid}/matches", params={"match_day": "2026-06-29"})
+    assert r.status_code == 200, r.text
+    synced = [m for m in r.json() if m["home_team"] == "阿根廷" and m["away_team"] == "法国"]
+    assert synced
+    assert synced[0]["stage"] == "32强"
+    assert synced[0]["round"] == "第2轮"
 
 
 def test_one_double_per_match_day():

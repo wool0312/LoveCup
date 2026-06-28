@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import threading
+import time
 import uuid
 
 import httpx
@@ -13,9 +15,11 @@ from ..core.fixtures import group_round_for_teams
 from ..core.stages import round_of, Stage as CoreStage
 from ..core.timeutil import match_day_of
 from ..models import entities as e
-from .auto_result import API_BASE, API_TOKEN, TEAM_NAME_MAP
+from .auto_result import API_BASE, TEAM_NAME_MAP
 
 log = logging.getLogger(__name__)
+_last_sync_at = 0.0
+_sync_lock = threading.Lock()
 
 API_STAGE_MAP: dict[str, e.Stage] = {
     "GROUP_STAGE": e.Stage.GROUP,
@@ -43,13 +47,14 @@ def _round_for_match(stage: e.Stage, home_cn: str, away_cn: str) -> e.RoundName:
 
 
 def fetch_api_matches() -> list[dict]:
-    if not API_TOKEN:
+    token = _api_token()
+    if not token:
         log.warning("FOOTBALL_DATA_API_TOKEN 未设置，跳过赛程同步")
         return []
     try:
         resp = httpx.get(
             f"{API_BASE}/competitions/WC/matches",
-            headers={"X-Auth-Token": API_TOKEN},
+            headers={"X-Auth-Token": token},
             timeout=15,
         )
         resp.raise_for_status()
@@ -57,6 +62,12 @@ def fetch_api_matches() -> list[dict]:
     except Exception as exc:
         log.error("football-data.org 赛程请求失败: %s", exc)
         return []
+
+
+def _api_token() -> str:
+    from .auto_result import _api_token as auto_result_api_token
+
+    return auto_result_api_token()
 
 
 def populate_matches(db: Session, game_id: str) -> int:
@@ -172,6 +183,25 @@ def sync_all_games() -> dict:
         raise
     finally:
         db.close()
+
+
+def maybe_sync_matches(min_interval_seconds: int = 300) -> dict:
+    """按需触发赛程同步，避免后台任务休眠后页面拿到旧赛程。
+
+    Render 免费实例被唤醒后，APScheduler 的 interval job 不会立刻跑；赛程页打开时
+    轻量触发一次同步，可以及时补入已确定的淘汰赛对阵。
+    """
+    global _last_sync_at
+    now = time.time()
+    if now - _last_sync_at < min_interval_seconds:
+        return {"synced": 0, "changes": [], "skipped": "throttled"}
+    if not _sync_lock.acquire(blocking=False):
+        return {"synced": 0, "changes": [], "skipped": "in_progress"}
+    try:
+        _last_sync_at = now
+        return sync_all_games()
+    finally:
+        _sync_lock.release()
 
 
 def _populate_fallback(db: Session, game_id: str) -> int:
