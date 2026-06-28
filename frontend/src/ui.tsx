@@ -1,8 +1,11 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 
-export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function Card({ children, className = "", ...props }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) {
   return (
-    <div className={`rounded-lg border border-emerald-900/10 bg-white/95 p-4 shadow-sm shadow-emerald-900/5 ${className}`}>
+    <div
+      className={`rounded-lg border border-emerald-900/10 bg-white/95 p-4 shadow-sm shadow-emerald-900/5 ${className}`}
+      {...props}
+    >
       {children}
     </div>
   );

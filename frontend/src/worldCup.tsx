@@ -5,7 +5,7 @@ export function TeamName({ team, className = "" }: { team: string; className?: s
   return (
     <span className={`inline-flex min-w-0 items-center gap-1 ${className}`}>
       <span className="truncate">{team}</span>
-      {flag && <span className="shrink-0 text-[1.05em] leading-none">{flag}</span>}
+      {flag && <span className="flag-wave shrink-0 text-[1.05em] leading-none">{flag}</span>}
     </span>
   );
 }

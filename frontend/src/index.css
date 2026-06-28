@@ -31,3 +31,101 @@ body::before {
   background-size: 100% 100%, 100% 100%, 100% 4.75rem;
   pointer-events: none;
 }
+
+.flag-wave {
+  display: inline-block;
+  transform-origin: 12% 50%;
+  animation: flag-wave 2.8s ease-in-out infinite;
+}
+
+.match-card-enter {
+  animation: match-card-enter 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.confetti-burst {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.confetti-burst span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.42rem;
+  height: 0.68rem;
+  border-radius: 2px;
+  background: #f6c453;
+  opacity: 0;
+  transform: translate(-50%, -50%) rotate(0deg);
+  animation: confetti-pop 900ms ease-out forwards;
+}
+
+.confetti-burst span:nth-child(2n) {
+  background: #0f766e;
+}
+
+.confetti-burst span:nth-child(3n) {
+  background: #e11d48;
+}
+
+.confetti-burst span:nth-child(1) { --x: -5rem; --y: -2.2rem; --r: -35deg; }
+.confetti-burst span:nth-child(2) { --x: -4rem; --y: 1.8rem; --r: 28deg; }
+.confetti-burst span:nth-child(3) { --x: -3rem; --y: -3rem; --r: 72deg; }
+.confetti-burst span:nth-child(4) { --x: -2rem; --y: 2.6rem; --r: -65deg; }
+.confetti-burst span:nth-child(5) { --x: -0.9rem; --y: -2.8rem; --r: 45deg; }
+.confetti-burst span:nth-child(6) { --x: 0.8rem; --y: 2.9rem; --r: -18deg; }
+.confetti-burst span:nth-child(7) { --x: 1.8rem; --y: -2.7rem; --r: 95deg; }
+.confetti-burst span:nth-child(8) { --x: 2.8rem; --y: 2rem; --r: -80deg; }
+.confetti-burst span:nth-child(9) { --x: 3.7rem; --y: -2rem; --r: 38deg; }
+.confetti-burst span:nth-child(10) { --x: 4.6rem; --y: 1.5rem; --r: -52deg; }
+.confetti-burst span:nth-child(11) { --x: -1.5rem; --y: -1.3rem; --r: 130deg; }
+.confetti-burst span:nth-child(12) { --x: 1.4rem; --y: 1.2rem; --r: -120deg; }
+.confetti-burst span:nth-child(13) { --x: -3.8rem; --y: 0.1rem; --r: 12deg; }
+.confetti-burst span:nth-child(14) { --x: 3.9rem; --y: -0.1rem; --r: -12deg; }
+
+@keyframes flag-wave {
+  0%, 100% {
+    transform: rotate(0deg) skewY(0deg);
+  }
+  35% {
+    transform: rotate(2deg) skewY(-4deg);
+  }
+  70% {
+    transform: rotate(-1deg) skewY(3deg);
+  }
+}
+
+@keyframes match-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes confetti-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.45) rotate(0deg);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) scale(1) rotate(var(--r));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flag-wave,
+  .match-card-enter,
+  .confetti-burst span {
+    animation: none;
+  }
+}

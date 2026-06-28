@@ -15,6 +15,8 @@ const FILTERS: { value: MatchFilter; label: string }[] = [
   { value: "settled", label: "已结算" },
 ];
 
+const CONFETTI_PIECES = Array.from({ length: 14 }, (_, i) => i);
+
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleString("zh-CN", {
     month: "2-digit",
@@ -46,6 +48,16 @@ function predictionWdl(pred: Prediction): WDL {
     return wdlFromScore(pred.pred_home, pred.pred_away);
   }
   return pred.wdl;
+}
+
+function ConfettiBurst() {
+  return (
+    <div className="confetti-burst" aria-hidden="true">
+      {CONFETTI_PIECES.map((piece) => (
+        <span key={piece} />
+      ))}
+    </div>
+  );
 }
 
 function PredictionForm({
@@ -156,7 +168,12 @@ function PredictionForm({
       </Field>
 
       {err && <Banner tone="error">{err}</Banner>}
-      {ok && <Banner tone="success">已保存</Banner>}
+      {ok && (
+        <div className="relative overflow-hidden rounded-lg">
+          <ConfettiBurst />
+          <Banner tone="success">已保存</Banner>
+        </div>
+      )}
       <Button onClick={save} className="w-full">
         保存预测
       </Button>
@@ -309,8 +326,12 @@ export default function MatchDay({ game }: { game: Game }) {
         <Banner tone="info">当前筛选下暂无比赛。</Banner>
       )}
 
-      {filteredMatches.map((m) => (
-        <Card key={m.id} className="overflow-hidden border-emerald-900/15 p-0">
+      {filteredMatches.map((m, index) => (
+        <Card
+          key={m.id}
+          className="match-card-enter overflow-hidden border-emerald-900/15 p-0"
+          style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
+        >
           <div className="bg-[linear-gradient(135deg,#064e3b,#0f766e)] px-4 py-3 text-white">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
