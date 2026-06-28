@@ -78,8 +78,8 @@ LoveCup/
 **计分核心**（`backend/app/core/`，纯函数、不碰数据库）：
 - `stages.py`：阶段基础分值表（PRD §4.1）、阶段→轮次映射、轮次权重（7/15/16/18/20/24%）。
 - `scoring.py`：`score_normal` / `score_double` / `match_score`，逐字对应 PRD §5 伪代码。
-  - 关键设计：WDL 与 净胜球/精确比分 分开判定 —— 淘汰赛胜负看晋级方（含点球），
-    净胜球/比分看加时结束比分（不含点球），对应 PRD §4.5。
+  - 关键设计：胜平负、净胜球、精确比分都按不含点球的比分判定；若有加时，
+    则按加时结束比分判定。点球大战只决定晋级方展示，不参与预测计分。
   - `Prediction.from_raw()` 自动保证「填了精确比分就同时给出净胜球」（PRD §5 约定）。
 - `settlement.py`：轮次净积分、最终加权积分、冠军同分规则（PRD §4.7 三级比较）、
   大胜认定（分差比例 ≥25% 且冠军积分 >0，PRD §4.8）。
@@ -111,7 +111,7 @@ cd backend
 存 UTC、展示转北京。`match_day_of()` 按开赛北京时间是否 ≥12:00 决定归属哪个比赛日。
 
 **结算服务**（`app/services/settlement.py`）：把数据库数据喂给计分核心，写 MatchScore
-（含 breakdown 明细 JSON）、RoundSummary、FinalResult。淘汰赛点球口径已处理。
+（含 breakdown 明细 JSON）、RoundSummary、FinalResult。淘汰赛点球不参与预测计分。
 
 **API 路由**（`app/api/routes.py`，前缀 `/api`，共 22 个端点）：
 - 开局设置 / 创建比赛 / 比赛日列表

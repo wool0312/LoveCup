@@ -4,8 +4,8 @@
 - 纯函数，不依赖数据库或框架 —— 满足 PRD "可复核"：任一场比赛得分可由
   保存的数据独立复算出一致结果。
 - 全程 Decimal，绝不用 float。
-- WDL 与 净胜球/精确比分 相互独立计算：淘汰赛 WDL 按最终晋级方（含点球），
-  净胜球/精确比分按加时结束比分（不含点球），见 PRD §4.5。
+- 胜平负、净胜球、精确比分都按常规时间结束比分判定；若有加时赛，
+  则按加时结束比分判定。点球大战只决定晋级方，不参与预测计分。
 """
 from __future__ import annotations
 
@@ -71,10 +71,10 @@ class Prediction:
 class MatchResult:
     """一场比赛的判定结果（核心层）。
 
-    wdl    —— 胜平负判定（淘汰赛按最终晋级方，含点球）
-    sgd    —— 净胜球 = home - away（按加时结束比分，不含点球）
-    home   —— 加时结束主队进球
-    away   —— 加时结束客队进球
+    wdl    —— 胜平负判定（点球大战不参与）
+    sgd    —— 净胜球 = home - away（点球大战不参与）
+    home   —— 常规时间或加时结束主队进球
+    away   —— 常规时间或加时结束客队进球
     """
 
     wdl: WDL
@@ -84,19 +84,13 @@ class MatchResult:
 
     @staticmethod
     def from_goals(home: int, away: int) -> "MatchResult":
-        """小组赛：直接由比分推出 WDL。"""
+        """直接由不含点球的比分推出 WDL。"""
         if home > away:
             wdl = WDL.HOME
         elif home < away:
             wdl = WDL.AWAY
         else:
             wdl = WDL.DRAW
-        return MatchResult(wdl=wdl, sgd=home - away, home=home, away=away)
-
-    @staticmethod
-    def from_knockout(home: int, away: int, advanced_home: bool) -> "MatchResult":
-        """淘汰赛：WDL 按晋级方（含点球），净胜球/比分按加时结束比分。"""
-        wdl = WDL.HOME if advanced_home else WDL.AWAY
         return MatchResult(wdl=wdl, sgd=home - away, home=home, away=away)
 
 

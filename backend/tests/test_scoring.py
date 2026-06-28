@@ -89,7 +89,7 @@ def test_case7_group_double_low_odds_favorite():
 def test_case8_qf_double_hit():
     """#8 8强·Double 押中：本金 8，odds=3.00，仅胜负，命中 → 普通 8 / Double 24。"""
     pred = Prediction.from_raw(WDL.HOME, use_double=True)
-    result = MatchResult.from_knockout(1, 0, advanced_home=True)
+    result = MatchResult.from_goals(1, 0)
     assert score_normal(pred, result, QF) == D(8)
     assert score_double(pred, result, QF, D("3.00")) == D(24)
 
@@ -116,14 +116,14 @@ def test_case10_odds_missing_falls_back_to_normal():
 
 
 def test_case11_knockout_penalty_shootout():
-    """#11 淘汰赛·点球：120 分钟 1:1，点球主胜；预测主胜+比分 1:1
-    → 胜负 + 净胜球(0) + 比分全中。"""
+    """#11 淘汰赛·点球不参与预测：120 分钟 1:1，点球主胜；
+    预测平+比分 1:1 → 胜平负 + 净胜球(0) + 比分全中。"""
     # 用 8 强阶段举例（w=8, gd=8, sc=16）
     pred = Prediction.from_raw(
-        WDL.HOME, has_score=True, pred_home=1, pred_away=1
+        WDL.DRAW, has_score=True, pred_home=1, pred_away=1
     )
-    result = MatchResult.from_knockout(1, 1, advanced_home=True)
-    # 胜负(8) + 净胜球0命中(8) + 比分1:1全中(16) = 32
+    result = MatchResult.from_goals(1, 1)
+    # 胜平负(8) + 净胜球0命中(8) + 比分1:1全中(16) = 32
     assert score_normal(pred, result, QF) == D(32)
 
 

@@ -61,12 +61,13 @@ def _create_match(game_id: str, *, stage=e.Stage.GROUP, home="巴西", away="韩
         db.close()
 
 
-def _settle_match(match_id: str, home_goals: int, away_goals: int):
+def _settle_match(match_id: str, home_goals: int, away_goals: int, advanced_team: e.WDL = None):
     db = SessionLocal()
     try:
         match = db.get(e.Match, match_id)
         match.home_goals = home_goals
         match.away_goals = away_goals
+        match.advanced_team = advanced_team
         scores = settle.settle_match(db, match)
         settle.recompute_standings(db, match.game_id)
         return {
@@ -189,6 +190,25 @@ def test_double_disabled_on_final():
     })
     assert r.status_code == 422
     assert "决赛禁用" in r.text
+
+
+def test_knockout_draw_score_ignores_penalty_winner():
+    r = client.post("/api/games", json=_game_payload())
+    game = r.json()
+    gid = game["id"]
+    p1 = game["players"][0]["id"]
+    mid = _create_match(gid, stage=e.Stage.QF, home="法国", away="阿根廷", days=2)
+
+    r = client.post(f"/api/matches/{mid}/predictions", json={
+        "player_id": p1, "player_pin": "1111", "wdl": "平", "has_score": True,
+        "pred_home": 1, "pred_away": 1,
+    })
+    assert r.status_code == 200, r.text
+
+    scores = _settle_match(mid, 1, 1, advanced_team=e.WDL.HOME)
+
+    from decimal import Decimal
+    assert scores[p1]["score"] == Decimal(32)
 
 
 def test_prediction_requires_player_pin():

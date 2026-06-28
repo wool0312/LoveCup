@@ -111,7 +111,7 @@ class Match(Base):
     # 结算后写入：常规+加时比分（不含点球）
     home_goals: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     away_goals: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    # 淘汰赛最终晋级方（含点球），用于胜平负判定
+    # 淘汰赛最终晋级方（含点球），仅用于展示；预测计分不看点球大战。
     advanced_team: Mapped[Optional[WDL]] = mapped_column(SAEnum(WDL), nullable=True)
 
     odds: Mapped[Optional["OddsSnapshot"]] = relationship(back_populates="match", uselist=False)

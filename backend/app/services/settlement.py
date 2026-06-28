@@ -40,13 +40,9 @@ def _core_stage(s: e.Stage) -> CoreStage:
 
 
 def _build_result(match: e.Match) -> sc.MatchResult:
-    """由比赛结果构造核心层 MatchResult（处理淘汰赛点球口径）。"""
+    """由不含点球的比赛比分构造核心层 MatchResult。"""
     home, away = match.home_goals, match.away_goals
-    if match.stage == e.Stage.GROUP:
-        return sc.MatchResult.from_goals(home, away)
-    # 淘汰赛：胜负看晋级方（含点球），净胜球/比分看加时结束比分
-    advanced_home = match.advanced_team == e.WDL.HOME
-    return sc.MatchResult.from_knockout(home, away, advanced_home=advanced_home)
+    return sc.MatchResult.from_goals(home, away)
 
 
 def _build_prediction(p: e.Prediction) -> sc.Prediction:

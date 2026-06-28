@@ -90,6 +90,17 @@ def _find_matches(db, home_cn: str, away_cn: str) -> list[e.Match]:
     ))
 
 
+def _score_without_penalties(score: dict) -> tuple[int | None, int | None]:
+    """取预测计分用比分：有加时取加时结束比分，否则取常规结束比分。"""
+    for key in ("extraTime", "fullTime", "regularTime"):
+        period = score.get(key) or {}
+        home = period.get("home")
+        away = period.get("away")
+        if home is not None and away is not None:
+            return home, away
+    return None, None
+
+
 def maybe_fetch_and_settle(min_interval_seconds: int = 60) -> dict:
     """按需触发自动结算，避免页面刚打开时等后台定时任务。
 
@@ -135,9 +146,7 @@ def fetch_and_settle() -> dict:
             home_en = am.get("homeTeam", {}).get("name", "")
             away_en = am.get("awayTeam", {}).get("name", "")
             score = am.get("score", {})
-            ft = score.get("fullTime", {})
-            home_goals = ft.get("home")
-            away_goals = ft.get("away")
+            home_goals, away_goals = _score_without_penalties(score)
 
             if home_goals is None or away_goals is None:
                 continue
@@ -160,7 +169,7 @@ def fetch_and_settle() -> dict:
                 m.home_goals = home_goals
                 m.away_goals = away_goals
 
-                # 小组赛不需要 advanced_team；淘汰赛需要额外处理
+                # 晋级方仅用于展示；预测计分只看不含点球的比分。
                 if m.stage != e.Stage.GROUP:
                     winner = score.get("winner")
                     if winner == "HOME_TEAM":
